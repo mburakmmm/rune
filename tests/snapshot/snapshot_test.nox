@@ -1,0 +1,100 @@
+# tests/snapshot/snapshot_test.nox — Deterministic Golden Snapshot parity tests.
+
+import nox.test
+import core
+from core import ConsoleOptions, Style
+import table
+from table import Table
+import panel
+from panel import Panel
+import rule
+from rule import Rule
+import markdown
+from markdown import Markdown
+import arguments
+from arguments import TYPE_STR, TYPE_INT
+import options
+from options import Option
+import cli
+from cli import Command, CliApp, CliResult
+
+# 1. Table Snapshot: Unicode Rounded
+opts_uni_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+tbl_uni: Table = Table("Users", "rounded", None, 1)
+tbl_uni.add_column("ID", "right")
+tbl_uni.add_column("Username", "left")
+tbl_uni.add_row(["1", "alice"])
+tbl_uni.add_row(["2", "bob"])
+actual_tbl_uni: str = tbl_uni.render(opts_uni_plain)
+
+expected_tbl_uni: str = """╭────┬──────────╮
+│ ID │ Username │
+├────┼──────────┤
+│  1 │ alice    │
+│  2 │ bob      │
+╰────┴──────────╯"""
+nox.test.assert_eq_str(actual_tbl_uni, expected_tbl_uni, "Table Unicode rounded snapshot mismatch")
+
+# 2. Table Snapshot: ASCII Fallback
+opts_ascii_plain: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+tbl_ascii: Table = Table("Users", "rounded", None, 1)
+tbl_ascii.add_column("ID", "right")
+tbl_ascii.add_column("Username", "left")
+tbl_ascii.add_row(["1", "alice"])
+tbl_ascii.add_row(["2", "bob"])
+actual_tbl_ascii: str = tbl_ascii.render(opts_ascii_plain)
+
+expected_tbl_ascii: str = """+----+----------+
+| ID | Username |
++----+----------+
+|  1 | alice    |
+|  2 | bob      |
++----+----------+"""
+nox.test.assert_eq_str(actual_tbl_ascii, expected_tbl_ascii, "Table ASCII fallback snapshot mismatch")
+
+# 3. Panel Snapshot: Rounded
+pnl: Panel = Panel("Rune toolkit", "Info", "v1.0", "rounded", 1, 0, None)
+actual_pnl: str = pnl.render(opts_uni_plain)
+
+expected_pnl: str = """╭─ Info ───────╮
+│ Rune toolkit │
+╰─────── v1.0 ─╯"""
+nox.test.assert_eq_str(actual_pnl, expected_pnl, "Panel rounded snapshot mismatch")
+
+# 4. Rule Snapshot: Centered
+rl: Rule = Rule("Test", "─", "center", None)
+opts_rule: ConsoleOptions = ConsoleOptions(False, True, 20, 24, False, True)
+actual_rule: str = rl.render(opts_rule)
+
+expected_rule: str = "─────── Test ───────"
+nox.test.assert_eq_str(actual_rule, expected_rule, "Rule centered snapshot mismatch")
+
+# 5. CLI Help Output Snapshot
+cmd: Command = Command("dock", "Container engine")
+cmd.add_argument("image", TYPE_STR, True, "", "Container image name")
+cmd.add_option("port", "p", TYPE_INT, False, False, "8080", "Port mapping")
+app: CliApp = CliApp(cmd, "0.9.0")
+con_help: core.Console = core.Console(opts_uni_plain)
+actual_help: str = cmd.format_help(con_help)
+
+expected_help: str = """Usage: dock [OPTIONS] <image>
+
+  Container engine
+
+Arguments:
+  image                     Container image name
+
+Options:
+  -h, --help                Show this message and exit
+  -p, --port <value>        Port mapping [default: 8080]"""
+nox.test.assert_eq_str(actual_help, expected_help, "CLI Help page snapshot mismatch")
+
+# 6. CLI Choice Error Diagnostic Snapshot
+cmd_choices: Command = Command("build")
+cmd_choices.add_option("target", "t", TYPE_STR, False, False, "dev", "Target environment", ["dev", "prod"])
+app_choices: CliApp = CliApp(cmd_choices, "0.9.0")
+res_choice: CliResult = app_choices.parse(["--target", "invalid"])
+nox.test.assert_true(not res_choice.is_success(), "Choice validation must fail")
+nox.test.assert_eq_str(res_choice.error_message, "Invalid value for '--target': 'invalid' is not one of [dev, prod]", "Choice error snapshot mismatch")
+
+print("snapshot_test passed")

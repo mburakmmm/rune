@@ -411,7 +411,31 @@ def detect_console_options() -> ConsoleOptions:
     term: str | None = get_env_safe("TERM")
     ci: str | None = get_env_safe("CI")
 
+    # Windows terminal environment detection
+    os_env: str | None = get_env_safe("OS")
+    wt_session: str | None = get_env_safe("WT_SESSION")
+    ansicon: str | None = get_env_safe("ANSICON")
+    conemu: str | None = get_env_safe("ConEmuANSI")
+
     supports_color: bool = True
+    supports_unicode: bool = True
+
+    if os_env is not None:
+        if os_env == "Windows_NT":
+            is_modern_win: bool = False
+            if wt_session is not None:
+                is_modern_win = True
+            else:
+                if ansicon is not None:
+                    is_modern_win = True
+                else:
+                    if conemu is not None:
+                        is_modern_win = True
+
+            if not is_modern_win:
+                supports_unicode = False
+                supports_color = False
+
     if no_color is not None:
         if len(no_color) > 0:
             supports_color = False
@@ -448,7 +472,7 @@ def detect_console_options() -> ConsoleOptions:
         except ValueError:
             pass
 
-    return ConsoleOptions(supports_color, True, term_width, term_height, is_tty, False)
+    return ConsoleOptions(supports_color, supports_unicode, term_width, term_height, is_tty, False)
 
 class Console:
     options: ConsoleOptions

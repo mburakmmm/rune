@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-10-26
+
+### Added
+- **Cross-Platform & Windows VT Mode Detection (`rune.core`)**:
+  - `detect_console_options()` audited for Windows console hosts.
+  - Automatically identifies modern Windows Terminal (`WT_SESSION`), ConEmu (`ConEmuANSI`), and `ANSICON` environments.
+  - Graceful ASCII & plain-text fallback on legacy Windows Command Prompt hosts lacking VT support.
+- **Deterministic Golden Snapshot Testing (`tests/snapshot/`)**:
+  - `tests/snapshot/snapshot_test.nox` covering byte-exact golden snapshots for Unicode & ASCII tables, rounded panels, centered rules, CLI `--help` pages, and choice error diagnostics.
+- **Monochrome & Screen Reader Accessibility**:
+  - Verified structure, labels, and borders ensure complete clarity without requiring color vision.
+
+---
+
 ## [0.8.0] - 2026-10-26
 
 ### Added

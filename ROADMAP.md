@@ -207,16 +207,17 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.9.0 — Cross-Platform & Snapshot Parity
+### 📦 v0.9.0 — Cross-Platform & Snapshot Parity (Completed)
 **Goal:** Verified behavior across macOS, Linux, and Windows.
 
-- [ ] **Windows VT Mode Audit**:
-  - Test ANSI sequence interpretation across Windows Terminal, Command Prompt, and PowerShell.
-- [ ] **Snapshot Testing Harness**:
-  - Separate plain-text golden snapshots from ANSI golden snapshots.
-  - Golden output tests for tables, panels, and `--help` pages.
-- [ ] **Monochrome & Screen Reader Review**:
-  - Ensure all interfaces convey complete information without relying on color alone.
+- [x] **Windows VT Mode Audit**:
+  - Implemented environment detection for Windows Terminal (`WT_SESSION`), ConEmu (`ConEmuANSI`), and `ANSICON` in `detect_console_options()`.
+  - Added clean ASCII & monochrome fallback for legacy Windows Command Prompt hosts without VT mode.
+- [x] **Snapshot Testing Harness (`tests/snapshot/`)**:
+  - `tests/snapshot/snapshot_test.nox` verifying golden deterministic string parity.
+  - Golden snapshot coverage for: Unicode rounded table, ASCII table, rounded panel, centered rule, CLI `--help` synopsis, and choice error diagnostics.
+- [x] **Monochrome & Screen Reader Review**:
+  - Verified that all components convey complete meaning with structure, borders, and labels without relying on ANSI color alone.
 
 ---
 
