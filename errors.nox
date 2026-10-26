@@ -1,0 +1,22 @@
+# errors.nox — Structured CLI exception hierarchy.
+
+class CliError(Exception):
+    pass
+
+class UsageError(CliError):
+    pass
+
+class UnknownOptionError(UsageError):
+    pass
+
+class MissingArgumentError(UsageError):
+    pass
+
+class MissingOptionValueError(UsageError):
+    pass
+
+class InvalidTypeError(UsageError):
+    pass
+
+class CommandNotFoundError(UsageError):
+    pass

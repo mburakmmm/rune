@@ -1,0 +1,27 @@
+# examples/rich_styling.nox — Styled text, colors, panels, and dividers.
+
+import rune
+from rune import Console, Style, Rule, Panel
+
+console: Console = Console()
+
+console.print("")
+console.print_styled("Welcome to Rune Terminal Styling!", Style("green", "", True))
+console.print_styled("Rune gives Nox applications beautiful terminal formatting with zero dependencies.", Style("cyan"))
+console.print("")
+
+r: Rule = Rule("System Diagnostics", "─", "center", Style("yellow"))
+console.print(r.render(console.options))
+console.print("")
+
+p: Panel = Panel(
+    "Status: ALL SYSTEMS OPERATIONAL\nLatency: 12ms\nMemory: 4.2 MB",
+    "Health Check",
+    "Production",
+    "rounded",
+    1,
+    50,
+    Style("bright_green")
+)
+console.print(p.render(console.options))
+console.print("")

@@ -1,0 +1,196 @@
+# table.nox — Formatted tabular display with column alignment, borders, and styles.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions, cell_width, strip_ansi
+
+class Column:
+    title: str
+    align: str
+    style: Style
+
+    def __init__(self: Column, title: str, align: str = "left", style: Style | None = None) -> None:
+        self.title = title
+        self.align = align
+        if style is not None:
+            self.style = style
+        else:
+            self.style = Style()
+
+class Row:
+    cells: list[str]
+
+    def __init__(self: Row, cells: list[str]) -> None:
+        self.cells = cells
+
+class Table:
+    title: str
+    columns: list[Column]
+    rows: list[Row]
+    border_style: str
+    header_style: Style
+    padding: int
+
+    def __init__(
+        self: Table,
+        title: str = "",
+        border_style: str = "rounded",
+        header_style: Style | None = None,
+        padding: int = 1
+    ) -> None:
+        self.title = title
+        self.columns = []
+        self.rows = []
+        self.border_style = border_style
+        if header_style is not None:
+            self.header_style = header_style
+        else:
+            self.header_style = Style("", "", True, False, False, False, False)
+        self.padding = padding
+
+    def add_column(self: Table, title: str, align: str = "left", style: Style | None = None) -> None:
+        self.columns.append(Column(title, align, style))
+
+    def add_row(self: Table, cells: list[str]) -> None:
+        self.rows.append(Row(cells))
+
+    def _align_cell(self: Table, text: str, width: int, align: str) -> str:
+        cw: int = cell_width(text)
+        if cw >= width:
+            return text
+        diff: int = width - cw
+        if align == "right":
+            return nox.strings.repeat(" ", diff) + text
+        elif align == "center":
+            left_p: int = diff // 2
+            right_p: int = diff - left_p
+            return nox.strings.repeat(" ", left_p) + text + nox.strings.repeat(" ", right_p)
+        else: # left
+            return text + nox.strings.repeat(" ", diff)
+
+    def render(self: Table, options: ConsoleOptions) -> str:
+        col_count: int = len(self.columns)
+        if col_count == 0:
+            return ""
+
+        # Calculate width of each column
+        col_widths: list[int] = []
+        c: int = 0
+        while c < col_count:
+            w: int = cell_width(self.columns[c].title)
+            r: int = 0
+            while r < len(self.rows):
+                row: Row = self.rows[r]
+                if c < len(row.cells):
+                    cw: int = cell_width(row.cells[c])
+                    if cw > w:
+                        w = cw
+                r = r + 1
+            col_widths.append(w)
+            c = c + 1
+
+        use_ascii: bool = not options.supports_unicode or self.border_style == "ascii"
+
+        # Border characters
+        tl: str = "╭"
+        tm: str = "┬"
+        tr: str = "╮"
+        ml: str = "├"
+        mm: str = "┼"
+        mr: str = "┤"
+        bl: str = "╰"
+        bm: str = "┴"
+        br: str = "╯"
+        h: str = "─"
+        v: str = "│"
+
+        if use_ascii:
+            tl = "+"
+            tm = "+"
+            tr = "+"
+            ml = "+"
+            mm = "+"
+            mr = "+"
+            bl = "+"
+            bm = "+"
+            br = "+"
+            h = "-"
+            v = "|"
+        elif self.border_style == "square":
+            tl = "┌"
+            tm = "┬"
+            tr = "┐"
+            ml = "├"
+            mm = "┼"
+            mr = "┤"
+            bl = "└"
+            bm = "┴"
+            br = "┘"
+            h = "─"
+            v = "│"
+
+        pad_str: str = nox.strings.repeat(" ", self.padding)
+        lines: list[str] = []
+
+        # 1. Top border
+        if self.border_style != "none" and self.border_style != "minimal":
+            top_parts: list[str] = []
+            ci: int = 0
+            while ci < col_count:
+                top_parts.append(nox.strings.repeat(h, col_widths[ci] + (self.padding * 2)))
+                ci = ci + 1
+            lines.append(tl + nox.strings.join(top_parts, tm) + tr)
+
+        # 2. Header row
+        hdr_cells: list[str] = []
+        ci2: int = 0
+        while ci2 < col_count:
+            col: Column = self.columns[ci2]
+            aligned_hdr: str = self._align_cell(col.title, col_widths[ci2], col.align)
+            if options.supports_color and not self.header_style.is_plain():
+                aligned_hdr = self.header_style.apply(aligned_hdr)
+            hdr_cells.append(pad_str + aligned_hdr + pad_str)
+            ci2 = ci2 + 1
+        lines.append(v + nox.strings.join(hdr_cells, v) + v)
+
+        # 3. Header separator
+        if self.border_style != "none":
+            sep_parts: list[str] = []
+            ci3: int = 0
+            while ci3 < col_count:
+                sep_parts.append(nox.strings.repeat(h, col_widths[ci3] + (self.padding * 2)))
+                ci3 = ci3 + 1
+            if self.border_style == "minimal":
+                lines.append(h + nox.strings.join(sep_parts, h) + h)
+            else:
+                lines.append(ml + nox.strings.join(sep_parts, mm) + mr)
+
+        # 4. Data rows
+        ri: int = 0
+        while ri < len(self.rows):
+            cur_row: Row = self.rows[ri]
+            row_cells: list[str] = []
+            ci4: int = 0
+            while ci4 < col_count:
+                val: str = ""
+                if ci4 < len(cur_row.cells):
+                    val = cur_row.cells[ci4]
+                col_def: Column = self.columns[ci4]
+                aligned_val: str = self._align_cell(val, col_widths[ci4], col_def.align)
+                if options.supports_color and not col_def.style.is_plain():
+                    aligned_val = col_def.style.apply(aligned_val)
+                row_cells.append(pad_str + aligned_val + pad_str)
+                ci4 = ci4 + 1
+            lines.append(v + nox.strings.join(row_cells, v) + v)
+            ri = ri + 1
+
+        # 5. Bottom border
+        if self.border_style != "none" and self.border_style != "minimal":
+            bot_parts: list[str] = []
+            ci5: int = 0
+            while ci5 < col_count:
+                bot_parts.append(nox.strings.repeat(h, col_widths[ci5] + (self.padding * 2)))
+                ci5 = ci5 + 1
+            lines.append(bl + nox.strings.join(bot_parts, bm) + br)
+
+        return nox.strings.join(lines, "\n")

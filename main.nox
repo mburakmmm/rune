@@ -1,0 +1,80 @@
+# main.nox — Rune CLI and Showcase Demonstration.
+
+import rune
+from rune import Console, Style, Rule, Panel, Table, Tree, TreeNode, ProgressBar, Task, Command, CliApp, CliResult, TYPE_STR, TYPE_INT, TYPE_BOOL
+
+def run_showcase(console: Console) -> None:
+    # 1. Title Banner
+    console.print("")
+    rule_top: Rule = Rule("Rune 0.1.0 Showcase", "─", "center", Style("cyan", "", True))
+    console.print(rule_top.render(console.options))
+    console.print("")
+
+    # 2. Panel
+    welcome_panel: Panel = Panel(
+        "Rune combines the capabilities of Python's Rich + Click + Typer\ninto a unified, statically typed, dependency-free toolkit for Nox.",
+        "About Rune",
+        "Nox Native",
+        "rounded",
+        1,
+        0,
+        Style("bright_blue")
+    )
+    console.print(welcome_panel.render(console.options))
+    console.print("")
+
+    # 3. Table
+    tbl: Table = Table("Package Ecosystem", "rounded", Style("bright_yellow", "", True))
+    tbl.add_column("Package", "left")
+    tbl.add_column("Purpose", "left")
+    tbl.add_column("Status", "center")
+
+    tbl.add_row(["Rune", "Rich + Click + Typer CLI & Rendering", "Active"])
+    tbl.add_row(["Nova", "HTTP/1.1 & REST API Client", "Active"])
+    tbl.add_row(["Noxen", "Type validation & ORM/ODM", "Active"])
+    tbl.add_row(["Feather", "Fast Web Framework", "Active"])
+
+    console.print(tbl.render(console.options))
+    console.print("")
+
+    # 4. Tree
+    tr: Tree = Tree("rune/", Style("bold"))
+    docs_node: TreeNode = tr.add("docs/")
+    docs_node.add("architecture.md")
+    docs_node.add("capabilities.md")
+    src_node: TreeNode = tr.add("rune/")
+    src_node.add("core.nox")
+    src_node.add("render.nox")
+    src_node.add("progress.nox")
+    src_node.add("prompt.nox")
+    src_node.add("cli.nox")
+    tr.add("nox.json")
+    tr.add("README.md")
+
+    console.print(tr.render(console.options))
+    console.print("")
+
+    # 5. Progress Bar
+    pb: ProgressBar = ProgressBar(20)
+    task: Task = pb.add_task("Verifying test suites", 100)
+    task.update(100)
+    console.print(pb.render_task(task, console.options))
+    console.print("")
+
+    rule_bot: Rule = Rule("", "─")
+    console.print(rule_bot.render(console.options))
+    console.print("")
+
+# CLI Entrypoint
+cmd: Command = Command("rune", "The unified terminal presentation + CLI framework for Nox")
+cmd.add_option("demo", "d", TYPE_BOOL, True, False, "false", "Run the visual demonstration showcase")
+cmd.add_option("version", "v", TYPE_BOOL, True, False, "false", "Print version")
+
+showcase_sub: Command = Command("demo", "Run interactive visual showcase")
+cmd.add_subcommand(showcase_sub)
+
+app: CliApp = CliApp(cmd, "0.1.0")
+res: CliResult = app.parse([])
+
+# If run directly without args, show showcase
+run_showcase(app.console)

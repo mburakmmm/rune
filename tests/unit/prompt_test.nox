@@ -1,0 +1,51 @@
+# tests/unit/prompt_test.nox — Unit tests for Prompt, Confirm, and Select.
+
+import nox.test
+import core
+from core import Console, ConsoleOptions
+
+import prompt
+from prompt import prompt_text, confirm, select_choice, prompt_password, NonInteractiveError, PromptError
+
+# Simulate CI / non-interactive environment
+opts_ci: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+ci_con: Console = Console(opts_ci)
+
+# 1. Non-interactive prompt with default returns default without blocking
+res1: str = prompt_text("Enter name", "NoxUser", ci_con)
+nox.test.assert_eq_str(res1, "NoxUser", "Non-interactive prompt must return default")
+
+# 2. Non-interactive prompt without default raises NonInteractiveError
+caught_error: bool = False
+try:
+    prompt_text("Enter secret", "", ci_con)
+except NonInteractiveError:
+    caught_error = True
+
+nox.test.assert_true(caught_error, "Missing default in non-interactive mode must raise NonInteractiveError")
+
+# 3. Non-interactive confirm returns default
+c_true: bool = confirm("Continue?", True, ci_con)
+nox.test.assert_true(c_true, "confirm must return True default in non-interactive mode")
+
+c_false: bool = confirm("Overwrite?", False, ci_con)
+nox.test.assert_true(not c_false, "confirm must return False default in non-interactive mode")
+
+# 4. Non-interactive select returns default or first choice
+choices: list[str] = ["apple", "banana", "cherry"]
+sel1: str = select_choice("Pick fruit", choices, "banana", ci_con)
+nox.test.assert_eq_str(sel1, "banana", "select_choice must return specified default")
+
+sel2: str = select_choice("Pick fruit", choices, "", ci_con)
+nox.test.assert_eq_str(sel2, "apple", "select_choice without default must return first choice")
+
+# 5. prompt_password must raise PromptError
+pw_caught: bool = False
+try:
+    prompt_password("Enter password: ")
+except PromptError:
+    pw_caught = True
+
+nox.test.assert_true(pw_caught, "prompt_password must raise PromptError due to runtime limitation")
+
+print("prompt_test passed")

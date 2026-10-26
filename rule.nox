@@ -1,0 +1,78 @@
+# rule.nox — Horizontal rule divider with optional title and styling.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions, cell_width, strip_ansi
+
+class Rule:
+    title: str
+    char: str
+    align: str
+    style: Style
+
+    def __init__(
+        self: Rule,
+        title: str = "",
+        char: str = "",
+        align: str = "center",
+        style: Style | None = None
+    ) -> None:
+        self.title = title
+        if len(char) > 0:
+            self.char = char
+        else:
+            self.char = "─"
+        self.align = align
+        if style is not None:
+            self.style = style
+        else:
+            self.style = Style()
+
+    def render(self: Rule, options: ConsoleOptions) -> str:
+        width: int = options.width
+        if width < 10:
+            width = 10
+
+        ch: str = self.char
+        if not options.supports_unicode and ch == "─":
+            ch = "-"
+
+        if len(self.title) == 0:
+            line: str = nox.strings.repeat(ch, width)
+            if options.supports_color and not self.style.is_plain():
+                return self.style.apply(line)
+            return line
+
+        t_clean: str = strip_ansi(self.title)
+        t_width: int = len(t_clean)
+        # title formatted as " Title "
+        needed: int = t_width + 4
+        if needed >= width:
+            # Not enough space for side rules
+            if options.supports_color and not self.style.is_plain():
+                return self.style.apply(self.title)
+            return self.title
+
+        remain: int = width - (t_width + 2)
+        left_count: int = remain // 2
+        right_count: int = remain - left_count
+
+        if self.align == "left":
+            left_count = 2
+            right_count = width - (t_width + 4)
+        elif self.align == "right":
+            right_count = 2
+            left_count = width - (t_width + 4)
+
+        if left_count < 1:
+            left_count = 1
+        if right_count < 1:
+            right_count = 1
+
+        left_side: str = nox.strings.repeat(ch, left_count)
+        right_side: str = nox.strings.repeat(ch, right_count)
+
+        res: str = left_side + " " + self.title + " " + right_side
+        if options.supports_color and not self.style.is_plain():
+            return self.style.apply(res)
+        return res

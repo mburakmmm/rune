@@ -1,0 +1,77 @@
+# tests/unit/render_test.nox — Unit tests for Rule, Panel, Table, and Tree components.
+
+import nox.test
+import core
+from core import Style, ConsoleOptions, strip_ansi
+
+import rule
+from rule import Rule
+
+import panel
+from panel import Panel
+
+import table
+from table import Table
+
+import tree
+from tree import Tree, TreeNode
+
+opts_unicode: ConsoleOptions = ConsoleOptions(True, True, 60, 24, True, True)
+opts_ascii: ConsoleOptions = ConsoleOptions(False, False, 60, 24, False, True)
+
+# 1. Rule test
+r1: Rule = Rule("Test Rule", "─", "center")
+r1_out: str = r1.render(opts_unicode)
+nox.test.assert_true("Test Rule" in r1_out, "Rule output must contain title")
+nox.test.assert_true("─" in r1_out, "Unicode rule must contain unicode char")
+
+r1_ascii: str = r1.render(opts_ascii)
+nox.test.assert_true("-" in r1_ascii, "ASCII fallback must use hyphen")
+nox.test.assert_true("─" not in r1_ascii, "ASCII fallback must not contain unicode")
+
+# 2. Panel test
+p1: Panel = Panel("Hello World\nLine 2", "My Panel", "Sub", "rounded", 1)
+p1_out: str = p1.render(opts_unicode)
+nox.test.assert_true("My Panel" in p1_out, "Panel must contain title")
+nox.test.assert_true("Sub" in p1_out, "Panel must contain subtitle")
+nox.test.assert_true("Hello World" in p1_out, "Panel must contain body")
+nox.test.assert_true("╭" in p1_out, "Rounded panel must have rounded corner")
+
+p1_ascii: str = p1.render(opts_ascii)
+nox.test.assert_true("+" in p1_ascii, "ASCII panel must use + corner")
+nox.test.assert_true("╭" not in p1_ascii, "ASCII panel must not have rounded corner")
+
+# 3. Table test
+tbl: Table = Table("Users", "rounded")
+tbl.add_column("ID", "right")
+tbl.add_column("Name", "left")
+tbl.add_column("Role", "center")
+
+tbl.add_row(["1", "Alice", "Admin"])
+tbl.add_row(["20", "Bob", "User"])
+
+tbl_out: str = tbl.render(opts_unicode)
+nox.test.assert_true("Alice" in tbl_out, "Table must contain row data")
+nox.test.assert_true("Role" in tbl_out, "Table must contain column title")
+nox.test.assert_true("╭" in tbl_out, "Rounded table must have rounded border")
+
+tbl_ascii: str = tbl.render(opts_ascii)
+nox.test.assert_true("+" in tbl_ascii, "ASCII table must use +")
+nox.test.assert_true("Admin" in tbl_ascii, "ASCII table must contain cell values")
+
+# 4. Tree test
+tr: Tree = Tree("Project Root")
+src: TreeNode = tr.add("src")
+src.add("main.nox")
+src.add("core.nox")
+tr.add("README.md")
+
+tr_out: str = tr.render(opts_unicode)
+nox.test.assert_true("Project Root" in tr_out, "Tree must render root")
+nox.test.assert_true("├── " in tr_out or "└── " in tr_out, "Tree must render unicode branches")
+nox.test.assert_true("main.nox" in tr_out, "Tree must render child nodes")
+
+tr_ascii: str = tr.render(opts_ascii)
+nox.test.assert_true("+-- " in tr_ascii or "\\-- " in tr_ascii, "ASCII tree must use ASCII branches")
+
+print("render_test passed")

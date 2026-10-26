@@ -1,0 +1,51 @@
+# tests/integration/integration_test.nox — Integration tests for end-to-end Rune workflows.
+
+import nox.test
+import rune
+from rune import Console, ConsoleOptions, Style, Rule, Panel, Table, Tree, ProgressBar, Command, CliApp, CliResult, TYPE_STR, TYPE_INT, TYPE_BOOL, strip_ansi
+
+# 1. End-to-end captured dashboard test
+opts: ConsoleOptions = ConsoleOptions(False, True, 70, 24, False, True)
+con: Console = Console(opts)
+
+# Render Rule
+r: Rule = Rule("SYSTEM STATUS", "─")
+con.print(r.render(con.options))
+
+# Render Panel
+p: Panel = Panel("CPU: 18%\nRAM: 1.2 GB / 16 GB\nDisk: 22% used", "Host Metrics", "", "rounded", 1)
+con.print(p.render(con.options))
+
+# Render Table
+tbl: Table = Table("Services", "rounded")
+tbl.add_column("Service", "left")
+tbl.add_column("Port", "right")
+tbl.add_column("State", "center")
+tbl.add_row(["api-gateway", "8000", "HEALTHY"])
+tbl.add_row(["database", "5432", "HEALTHY"])
+con.print(tbl.render(con.options))
+
+out: str = con.get_captured()
+
+# Validate that captured output contains all rendered components
+nox.test.assert_true("SYSTEM STATUS" in out, "Integration output must contain Rule")
+nox.test.assert_true("Host Metrics" in out, "Integration output must contain Panel")
+nox.test.assert_true("CPU: 18%" in out, "Integration output must contain Panel body")
+nox.test.assert_true("api-gateway" in out, "Integration output must contain Table rows")
+nox.test.assert_true("HEALTHY" in out, "Integration output must contain Table cell values")
+
+# 2. Integration CLI app dispatch
+cmd: Command = Command("build-tool", "Test build tool")
+cmd.add_argument("target", TYPE_STR, True, "", "Target to build")
+cmd.add_option("jobs", "j", TYPE_INT, False, False, "4", "Number of parallel jobs")
+cmd.add_option("release", "r", TYPE_BOOL, True, False, "false", "Release mode")
+
+app: CliApp = CliApp(cmd, "0.1.0", con)
+
+res: CliResult = app.parse(["all", "-j", "8", "-r"])
+nox.test.assert_true(res.is_success(), "CLI parse must succeed")
+nox.test.assert_eq_str(res.context.get_str("target"), "all", "Target argument matches")
+nox.test.assert_eq_int(res.context.get_int("jobs"), 8, "Jobs int option parsed")
+nox.test.assert_true(res.context.get_bool("release"), "Release flag parsed")
+
+print("integration_test passed")

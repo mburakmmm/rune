@@ -1,0 +1,13 @@
+# render.nox — Facade for visual components: Rule, Panel, Table, and Tree.
+
+import rule
+from rule import Rule
+
+import panel
+from panel import Panel
+
+import table
+from table import Table, Column, Row
+
+import tree
+from tree import Tree, TreeNode

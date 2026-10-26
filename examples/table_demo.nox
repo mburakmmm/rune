@@ -1,0 +1,35 @@
+# examples/table_demo.nox — Comprehensive table borders, alignments, and custom styling.
+
+import rune
+from rune import Console, Style, Table
+
+console: Console = Console()
+
+console.print("")
+console.print_styled("Rune Table Styles Demo", Style("cyan", "", True))
+console.print("")
+
+# 1. Rounded Table
+tbl1: Table = Table("Server Cluster", "rounded", Style("bright_blue", "", True))
+tbl1.add_column("Node ID", "right")
+tbl1.add_column("Hostname", "left")
+tbl1.add_column("Region", "left")
+tbl1.add_column("Load", "center")
+
+tbl1.add_row(["node-01", "us-east-worker.nox", "us-east", "42%"])
+tbl1.add_row(["node-02", "eu-central-worker.nox", "eu-central", "78%"])
+tbl1.add_row(["node-03", "ap-south-worker.nox", "ap-south", "15%"])
+
+console.print(tbl1.render(console.options))
+console.print("")
+
+# 2. ASCII Table for fallback/CI
+tbl2: Table = Table("Legacy System Fallback", "ascii")
+tbl2.add_column("Key", "left")
+tbl2.add_column("Value", "right")
+
+tbl2.add_row(["version", "2.0.27"])
+tbl2.add_row(["architecture", "arm64"])
+
+console.print(tbl2.render(console.options))
+console.print("")

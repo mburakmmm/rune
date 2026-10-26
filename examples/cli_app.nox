@@ -1,0 +1,37 @@
+# examples/cli_app.nox — Real-world CLI application built with Rune.
+
+import rune
+from rune import Command, CliApp, CliResult, Style, Table, TYPE_STR, TYPE_INT, TYPE_BOOL
+
+# 1. Root Command
+root: Command = Command("dock", "A container orchestration utility for Nox")
+root.add_option("config", "c", TYPE_STR, False, False, "dock.yaml", "Configuration file path")
+root.add_option("verbose", "v", TYPE_BOOL, True, False, "false", "Enable verbose debug logs")
+
+# 2. Subcommand: ps
+ps_cmd: Command = Command("ps", "List active containers")
+ps_cmd.add_option("all", "a", TYPE_BOOL, True, False, "false", "Show all containers including stopped")
+root.add_subcommand(ps_cmd)
+
+# 3. Subcommand: run
+run_cmd: Command = Command("run", "Start a new container image")
+run_cmd.add_argument("image", TYPE_STR, True, "", "Container image name")
+run_cmd.add_option("port", "p", TYPE_INT, False, False, "8080", "Port to expose")
+root.add_subcommand(run_cmd)
+
+app: CliApp = CliApp(root, "0.1.0")
+
+# Demonstrate CLI invocation with simulated argv: dock ps
+app.console.print("")
+app.console.print_styled("--- 1. Invoking: dock --help ---", Style("cyan", "", True))
+app.run(["--help"])
+
+app.console.print("")
+app.console.print_styled("--- 2. Invoking: dock run redis -p 6379 ---", Style("green", "", True))
+res: CliResult = app.parse(["run", "redis", "-p", "6379"])
+if res.is_success():
+    img: str = res.context.get_str("image")
+    port: int = res.context.get_int("port")
+    app.console.print("Successfully started container '" + img + "' bound to port " + str(port))
+
+app.console.print("")

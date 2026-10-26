@@ -1,0 +1,108 @@
+# tree.nox — Hierarchical tree view rendering with branching connectors.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions
+
+class TreeNode:
+    label: str
+    style: Style
+    children: list[TreeNode]
+
+    def __init__(self: TreeNode, label: str, style: Style | None = None) -> None:
+        self.label = label
+        if style is not None:
+            self.style = style
+        else:
+            self.style = Style()
+        self.children = []
+
+    def add(self: TreeNode, label: str, style: Style | None = None) -> TreeNode:
+        child: TreeNode = TreeNode(label, style)
+        self.children.append(child)
+        return child
+
+    def add_node(self: TreeNode, child: TreeNode) -> TreeNode:
+        self.children.append(child)
+        return child
+
+class TreeItem:
+    node: TreeNode
+    prefix: str
+    is_last: bool
+    is_root: bool
+
+    def __init__(self: TreeItem, node: TreeNode, prefix: str, is_last: bool, is_root: bool) -> None:
+        self.node = node
+        self.prefix = prefix
+        self.is_last = is_last
+        self.is_root = is_root
+
+class Tree:
+    root: TreeNode
+    guide_style: Style
+
+    def __init__(self: Tree, label: str, style: Style | None = None, guide_style: Style | None = None) -> None:
+        self.root = TreeNode(label, style)
+        if guide_style is not None:
+            self.guide_style = guide_style
+        else:
+            self.guide_style = Style()
+
+    def add(self: Tree, label: str, style: Style | None = None) -> TreeNode:
+        return self.root.add(label, style)
+
+    def render(self: Tree, options: ConsoleOptions) -> str:
+        use_ascii: bool = not options.supports_unicode
+        branch_char: str = "├── "
+        last_char: str = "└── "
+        vert_char: str = "│   "
+        space_char: str = "    "
+
+        if use_ascii:
+            branch_char = "+-- "
+            last_char = "\\-- "
+            vert_char = "|   "
+            space_char = "    "
+
+        lines: list[str] = []
+        stack: list[TreeItem] = []
+        stack.append(TreeItem(self.root, "", True, True))
+
+        while len(stack) > 0:
+            item: TreeItem = stack.pop()
+            node: TreeNode = item.node
+
+            line: str = ""
+            if item.is_root:
+                line = node.label
+            else:
+                guide: str = branch_char
+                if item.is_last:
+                    guide = last_char
+                if options.supports_color and not self.guide_style.is_plain():
+                    guide = self.guide_style.apply(guide)
+                line = item.prefix + guide + node.label
+
+            if options.supports_color and not node.style.is_plain():
+                line = node.style.apply(line)
+            lines.append(line)
+
+            # Push children in reverse order so first child is popped first
+            c_count: int = len(node.children)
+            if c_count > 0:
+                child_prefix: str = item.prefix
+                if not item.is_root:
+                    if item.is_last:
+                        child_prefix = child_prefix + space_char
+                    else:
+                        child_prefix = child_prefix + vert_char
+
+                ci: int = c_count - 1
+                while ci >= 0:
+                    child_node: TreeNode = node.children[ci]
+                    child_is_last: bool = (ci == c_count - 1)
+                    stack.append(TreeItem(child_node, child_prefix, child_is_last, False))
+                    ci = ci - 1
+
+        return nox.strings.join(lines, "\n")

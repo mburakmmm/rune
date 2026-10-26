@@ -1,0 +1,31 @@
+# options.nox — Option and flag definitions.
+
+import arguments
+from arguments import TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+
+class Option:
+    name: str
+    short_name: str
+    opt_type: int
+    is_flag: bool
+    required: bool
+    default_val: str
+    help: str
+
+    def __init__(
+        self: Option,
+        name: str,
+        short_name: str = "",
+        opt_type: int = 1,
+        is_flag: bool = False,
+        required: bool = False,
+        default_val: str = "",
+        help: str = ""
+    ) -> None:
+        self.name = name
+        self.short_name = short_name
+        self.opt_type = opt_type
+        self.is_flag = is_flag
+        self.required = required
+        self.default_val = default_val
+        self.help = help

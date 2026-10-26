@@ -1,0 +1,134 @@
+# panel.nox — Visual box panel with borders, title, and padding.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions, cell_width, strip_ansi
+
+class Panel:
+    content: str
+    title: str
+    subtitle: str
+    border_style: str
+    padding: int
+    width: int
+    style: Style
+
+    def __init__(
+        self: Panel,
+        content: str,
+        title: str = "",
+        subtitle: str = "",
+        border_style: str = "rounded",
+        padding: int = 1,
+        width: int = 0,
+        style: Style | None = None
+    ) -> None:
+        self.content = content
+        self.title = title
+        self.subtitle = subtitle
+        self.border_style = border_style
+        self.padding = padding
+        self.width = width
+        if style is not None:
+            self.style = style
+        else:
+            self.style = Style()
+
+    def render(self: Panel, options: ConsoleOptions) -> str:
+        tl: str = "╭"
+        tr: str = "╮"
+        bl: str = "╰"
+        br: str = "╯"
+        h: str = "─"
+        v: str = "│"
+
+        use_ascii: bool = not options.supports_unicode or self.border_style == "ascii"
+        if use_ascii:
+            tl = "+"
+            tr = "+"
+            bl = "+"
+            br = "+"
+            h = "-"
+            v = "|"
+        elif self.border_style == "square":
+            tl = "┌"
+            tr = "┐"
+            bl = "└"
+            br = "┘"
+            h = "─"
+            v = "│"
+        elif self.border_style == "double":
+            tl = "╔"
+            tr = "╗"
+            bl = "╚"
+            br = "╝"
+            h = "═"
+            v = "║"
+
+        lines: list[str] = nox.strings.split(self.content, "\n")
+        max_content_w: int = 0
+        i: int = 0
+        while i < len(lines):
+            cw: int = cell_width(lines[i])
+            if cw > max_content_w:
+                max_content_w = cw
+            i = i + 1
+
+        t_cw: int = cell_width(self.title)
+        if t_cw + 4 > max_content_w:
+            max_content_w = t_cw + 4
+
+        s_cw: int = cell_width(self.subtitle)
+        if s_cw + 4 > max_content_w:
+            max_content_w = s_cw + 4
+
+        # Compute inner content width
+        inner_w: int = max_content_w + (self.padding * 2)
+        if self.width > 2:
+            inner_w = self.width - 2
+
+        # Bounded by console width
+        max_allowed_inner: int = options.width - 2
+        if max_allowed_inner > 10 and inner_w > max_allowed_inner:
+            inner_w = max_allowed_inner
+
+        # 1. Top border
+        top_line: str = ""
+        if len(self.title) > 0:
+            top_title_space: int = inner_w - (t_cw + 2)
+            if top_title_space >= 2:
+                top_line = tl + h + " " + self.title + " " + nox.strings.repeat(h, top_title_space - 1) + tr
+            else:
+                top_line = tl + nox.strings.repeat(h, inner_w) + tr
+        else:
+            top_line = tl + nox.strings.repeat(h, inner_w) + tr
+
+        # 2. Body lines
+        body_parts: list[str] = []
+        pad_str: str = nox.strings.repeat(" ", self.padding)
+        j: int = 0
+        while j < len(lines):
+            line_str: str = lines[j]
+            line_cw: int = cell_width(line_str)
+            trailing_spaces: int = inner_w - self.padding - line_cw
+            if trailing_spaces < 0:
+                trailing_spaces = 0
+            row: str = v + pad_str + line_str + nox.strings.repeat(" ", trailing_spaces) + v
+            body_parts.append(row)
+            j = j + 1
+
+        # 3. Bottom border
+        bot_line: str = ""
+        if len(self.subtitle) > 0:
+            bot_sub_space: int = inner_w - (s_cw + 2)
+            if bot_sub_space >= 2:
+                bot_line = bl + nox.strings.repeat(h, bot_sub_space - 1) + " " + self.subtitle + " " + h + br
+            else:
+                bot_line = bl + nox.strings.repeat(h, inner_w) + br
+        else:
+            bot_line = bl + nox.strings.repeat(h, inner_w) + br
+
+        full_panel: str = top_line + "\n" + nox.strings.join(body_parts, "\n") + "\n" + bot_line
+        if options.supports_color and not self.style.is_plain():
+            return self.style.apply(full_panel)
+        return full_panel

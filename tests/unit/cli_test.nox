@@ -1,0 +1,96 @@
+# tests/unit/cli_test.nox — Comprehensive unit tests for Rune CLI framework.
+
+import nox.test
+import core
+from core import Console, ConsoleOptions
+import arguments
+from arguments import TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+import options
+from options import Option
+import cli
+from cli import Command, CliApp, CliResult, CliContext
+
+opts_ci: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+test_con: Console = Console(opts_ci)
+
+# 1. Basic command parsing with options and arguments
+cmd: Command = Command("compiler", "A test compiler CLI")
+cmd.add_argument("source", TYPE_STR, True, "", "Source file to compile")
+cmd.add_argument("optimization", TYPE_INT, False, "0", "Optimization level")
+cmd.add_option("output", "o", TYPE_STR, False, False, "bin/app", "Output path")
+cmd.add_option("verbose", "v", TYPE_BOOL, True, False, "false", "Verbose flag")
+
+app: CliApp = CliApp(cmd, "1.0.0", test_con)
+
+# Test valid execution: compiler main.nox 2 -o mybin -v
+res1: CliResult = app.parse(["main.nox", "2", "-o", "mybin", "-v"])
+nox.test.assert_true(res1.is_success(), "Valid CLI arguments should succeed")
+nox.test.assert_eq_str(res1.context.get_str("source"), "main.nox", "Positional argument matched")
+nox.test.assert_eq_int(res1.context.get_int("optimization"), 2, "Typed int positional matched")
+nox.test.assert_eq_str(res1.context.get_str("output"), "mybin", "Short option -o parsed")
+nox.test.assert_true(res1.context.get_bool("verbose"), "Flag -v should be True")
+
+# Test --key=value syntax
+res2: CliResult = app.parse(["app.nox", "--output=dist/bundle"])
+nox.test.assert_true(res2.is_success(), "--key=value syntax must succeed")
+nox.test.assert_eq_str(res2.context.get_str("output"), "dist/bundle", "--output=value parsed")
+nox.test.assert_eq_int(res2.context.get_int("optimization"), 0, "Default int applied")
+nox.test.assert_true(not res2.context.get_bool("verbose"), "Unset flag must default to False")
+
+# 2. Negative numbers must not be confused with options
+math_cmd: Command = Command("calc")
+math_cmd.add_argument("val", TYPE_INT, True)
+math_app: CliApp = CliApp(math_cmd, "1.0.0", test_con)
+res_neg: CliResult = math_app.parse(["-42"])
+nox.test.assert_true(res_neg.is_success(), "Negative numbers must parse as positionals")
+nox.test.assert_eq_int(res_neg.context.get_int("val"), -42, "Negative int value must be preserved")
+
+# 3. End of options delimiter --
+del_cmd: Command = Command("runner")
+del_cmd.add_argument("param", TYPE_STR, True)
+del_cmd.add_option("force", "f", TYPE_BOOL, True)
+del_app: CliApp = CliApp(del_cmd, "1.0.0", test_con)
+
+res_del: CliResult = del_app.parse(["--", "-f"])
+nox.test.assert_true(res_del.is_success(), "Tokens after -- must be treated as positional")
+nox.test.assert_eq_str(res_del.context.get_str("param"), "-f", "Positional received -f literally")
+nox.test.assert_true(not res_del.context.get_bool("force"), "Flag -f must not be set when after --")
+
+# 4. Error cases
+# Missing required argument
+res_missing: CliResult = app.parse([])
+nox.test.assert_true(not res_missing.is_success(), "Missing required argument must fail")
+nox.test.assert_eq_int(res_missing.exit_code, 2, "Usage error exit code must be 2")
+
+# Invalid integer type
+res_bad_int: CliResult = app.parse(["main.nox", "not_a_number"])
+nox.test.assert_true(not res_bad_int.is_success(), "Invalid integer argument must fail")
+nox.test.assert_eq_int(res_bad_int.exit_code, 2, "Invalid int exit code must be 2")
+
+# Unknown option
+res_unknown: CliResult = app.parse(["main.nox", "--unknown-flag"])
+nox.test.assert_true(not res_unknown.is_success(), "Unknown option must fail")
+nox.test.assert_eq_int(res_unknown.exit_code, 2, "Unknown option exit code must be 2")
+
+# 5. Help and Version flags
+res_help: CliResult = app.parse(["--help"])
+nox.test.assert_eq_int(res_help.exit_code, 0, "Help must return exit code 0")
+nox.test.assert_true(res_help.help_requested, "help_requested must be True")
+
+res_ver: CliResult = app.parse(["--version"])
+nox.test.assert_eq_int(res_ver.exit_code, 0, "Version must return exit code 0")
+nox.test.assert_true(res_ver.version_requested, "version_requested must be True")
+
+# 6. Subcommands
+git_cmd: Command = Command("git", "Version control")
+commit_cmd: Command = Command("commit", "Record changes")
+commit_cmd.add_option("message", "m", TYPE_STR, False, True, "", "Commit message")
+git_cmd.add_subcommand(commit_cmd)
+
+git_app: CliApp = CliApp(git_cmd, "2.40.0", test_con)
+res_sub: CliResult = git_app.parse(["commit", "-m", "Initial commit"])
+nox.test.assert_true(res_sub.is_success(), "Subcommand commit must succeed")
+nox.test.assert_eq_str(res_sub.command.name, "commit", "Dispatched to subcommand commit")
+nox.test.assert_eq_str(res_sub.context.get_str("message"), "Initial commit", "Option on subcommand captured")
+
+print("cli_test passed")

@@ -1,0 +1,121 @@
+# prompt.nox — Safe, non-blocking-capable interactive prompts and confirmations.
+
+import nox.strings
+import core
+from core import Console, ConsoleOptions, Style
+
+class PromptError(Exception):
+    pass
+
+class NonInteractiveError(PromptError):
+    pass
+
+def prompt_text(
+    question: str,
+    default_val: str = "",
+    console: Console | None = None
+) -> str:
+    con: Console = Console()
+    if console is not None:
+        con = console
+
+    if not con.options.is_tty:
+        if len(default_val) > 0:
+            return default_val
+        raise NonInteractiveError("Prompt '" + question + "' required input in non-interactive environment without default")
+
+    prompt_msg: str = question
+    if len(default_val) > 0:
+        prompt_msg = prompt_msg + " [" + default_val + "]: "
+    else:
+        prompt_msg = prompt_msg + ": "
+
+    con.write(prompt_msg)
+    user_input: str = nox.strings.trim(input())
+    if len(user_input) == 0:
+        return default_val
+    return user_input
+
+def confirm(
+    question: str,
+    default_val: bool = True,
+    console: Console | None = None
+) -> bool:
+    con: Console = Console()
+    if console is not None:
+        con = console
+
+    if not con.options.is_tty:
+        return default_val
+
+    suffix: str = "[Y/n]: "
+    if not default_val:
+        suffix = "[y/N]: "
+
+    con.write(question + " " + suffix)
+    ans: str = nox.strings.lower(nox.strings.trim(input()))
+    if len(ans) == 0:
+        return default_val
+    if ans == "y" or ans == "yes" or ans == "true" or ans == "1":
+        return True
+    if ans == "n" or ans == "no" or ans == "false" or ans == "0":
+        return False
+    return default_val
+
+def select_choice(
+    question: str,
+    choices: list[str],
+    default_val: str = "",
+    console: Console | None = None
+) -> str:
+    con: Console = Console()
+    if console is not None:
+        con = console
+
+    if len(choices) == 0:
+        return default_val
+
+    if not con.options.is_tty:
+        if len(default_val) > 0:
+            return default_val
+        return choices[0]
+
+    con.print(question)
+    i: int = 0
+    while i < len(choices):
+        con.print("  " + str(i + 1) + ") " + choices[i])
+        i = i + 1
+
+    suffix: str = "Choose [1-" + str(len(choices)) + "]: "
+    if len(default_val) > 0:
+        suffix = "Choose [1-" + str(len(choices)) + ", default=" + default_val + "]: "
+
+    con.write(suffix)
+    user_raw: str = nox.strings.trim(input())
+    if len(user_raw) == 0:
+        if len(default_val) > 0:
+            return default_val
+        return choices[0]
+
+    # Try numeric match
+    try:
+        idx: int = int(user_raw)
+        if idx >= 1 and idx <= len(choices):
+            return choices[idx - 1]
+    except ValueError:
+        pass
+
+    # Try exact string match
+    j: int = 0
+    while j < len(choices):
+        if choices[j] == user_raw:
+            return choices[j]
+        j = j + 1
+
+    if len(default_val) > 0:
+        return default_val
+    return choices[0]
+
+def prompt_password(question: str) -> str:
+    # Explicitly documented limitation according to AGENTS.md §11
+    raise PromptError("Echo-suppressed password input is not currently supported by the Nox runtime")

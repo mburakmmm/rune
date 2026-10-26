@@ -1,0 +1,49 @@
+# tests/unit/progress_test.nox — Unit tests for Task, ProgressBar, and Spinner.
+
+import nox.test
+import core
+from core import ConsoleOptions
+
+import progress
+from progress import Task, ProgressBar, Spinner
+
+opts_unicode: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, True)
+opts_ascii: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+
+# 1. Task progress
+t: Task = Task("Building", 200)
+nox.test.assert_eq_int(t.percentage(), 0, "Initial percentage must be 0")
+nox.test.assert_true(not t.is_finished(), "Task must not be finished initially")
+
+t.advance(50)
+nox.test.assert_eq_int(t.percentage(), 25, "50/200 must be 25%")
+
+t.update(200)
+nox.test.assert_eq_int(t.percentage(), 100, "200/200 must be 100%")
+nox.test.assert_true(t.is_finished(), "Task must be marked finished at total")
+
+# 2. ProgressBar rendering
+pb: ProgressBar = ProgressBar(10)
+pbt: Task = pb.add_task("Compiling", 100)
+pbt.update(50)
+
+rendered_u: str = pb.render_task(pbt, opts_unicode)
+nox.test.assert_true("50%" in rendered_u, "Progress must show 50%")
+nox.test.assert_true("█" in rendered_u, "Unicode bar must contain block char")
+
+rendered_a: str = pb.render_task(pbt, opts_ascii)
+nox.test.assert_true("=" in rendered_a, "ASCII bar must contain = char")
+nox.test.assert_true("█" not in rendered_a, "ASCII bar must not contain block char")
+
+# 3. Spinner
+sp: Spinner = Spinner("Loading assets")
+f1: str = sp.next_frame(True)
+f2: str = sp.next_frame(True)
+nox.test.assert_true(f1 != f2, "Spinner frames must advance")
+
+# 4. Non-TTY spinner fallback
+ci_status: str = sp.render(opts_ascii)
+nox.test.assert_true("[STATUS]" in ci_status, "Non-TTY mode must use [STATUS] prefix")
+nox.test.assert_true("Loading assets" in ci_status, "Status must include message")
+
+print("progress_test passed")

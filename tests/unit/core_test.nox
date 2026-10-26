@@ -1,0 +1,48 @@
+# tests/unit/core_test.nox — Unit tests for Rune core, styling, and ANSI safety.
+
+import nox.test
+import core
+from core import Style, strip_ansi, sanitize_ansi, cell_width, Console, ConsoleOptions, esc_code, reset_code
+
+# 1. Style formatting
+plain_style: Style = Style()
+nox.test.assert_true(plain_style.is_plain(), "Default style must be plain")
+nox.test.assert_eq_str(plain_style.apply("hello"), "hello", "Plain style should not modify text")
+
+green_bold: Style = Style("green", "", True, False, False, False, False)
+nox.test.assert_true(not green_bold.is_plain(), "Styled must not be plain")
+ansi_green: str = green_bold.apply("Nox")
+nox.test.assert_true(esc_code() in ansi_green, "Styled text must contain ESC byte")
+nox.test.assert_true(reset_code() in ansi_green, "Styled text must contain reset code")
+
+# 2. strip_ansi
+clean_text: str = strip_ansi(ansi_green)
+nox.test.assert_eq_str(clean_text, "Nox", "strip_ansi must remove all ANSI formatting")
+
+text_with_osc: str = esc_code() + "]0;Hacked Title" + nox.strings.char_from_byte(7) + "Safe"
+nox.test.assert_eq_str(strip_ansi(text_with_osc), "Safe", "strip_ansi must strip OSC title escape")
+
+# 3. sanitize_ansi
+dirty_input: str = "Hello" + nox.strings.char_from_byte(1) + esc_code() + "[31mWorld"
+sanitized: str = sanitize_ansi(dirty_input)
+nox.test.assert_eq_str(sanitized, "HelloWorld", "sanitize_ansi must strip control chars and CSI")
+
+# 4. cell_width
+nox.test.assert_eq_int(cell_width("hello"), 5, "cell_width of 'hello' is 5")
+nox.test.assert_eq_int(cell_width(ansi_green), 3, "cell_width of styled 'Nox' must be 3")
+
+# 5. Console capturing & plain-text fallback
+opts_captured: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+con: Console = Console(opts_captured)
+con.print("Header")
+con.print_styled("Colored", green_bold)
+captured: str = con.get_captured()
+
+nox.test.assert_true("Header\n" in captured, "Console must capture printed text")
+nox.test.assert_true(esc_code() not in captured, "Plain-mode capture must not contain ESC sequences")
+nox.test.assert_true("Colored\n" in captured, "Plain-mode capture must preserve text content")
+
+con.clear_captured()
+nox.test.assert_eq_str(con.get_captured(), "", "clear_captured must empty buffer")
+
+print("core_test passed")

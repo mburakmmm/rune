@@ -1,0 +1,125 @@
+# progress.nox — Deterministic progress bars, tasks, and spinner status indicators.
+
+import nox.strings
+import nox.time
+import core
+from core import Style, ConsoleOptions, cell_width
+
+class Task:
+    name: str
+    total: int
+    completed: int
+    finished: bool
+    start_time_ms: int
+
+    def __init__(self: Task, name: str, total: int = 100) -> None:
+        self.name = name
+        self.total = total
+        self.completed = 0
+        self.finished = False
+        self.start_time_ms = nox.time.now_ms()
+
+    def advance(self: Task, step: int = 1) -> None:
+        self.completed = self.completed + step
+        if self.total > 0 and self.completed >= self.total:
+            self.completed = self.total
+            self.finished = True
+
+    def update(self: Task, completed: int) -> None:
+        self.completed = completed
+        if self.total > 0 and self.completed >= self.total:
+            self.completed = self.total
+            self.finished = True
+
+    def percentage(self: Task) -> int:
+        if self.total <= 0:
+            return 0
+        pct: int = (self.completed * 100) // self.total
+        if pct > 100:
+            return 100
+        return pct
+
+    def is_finished(self: Task) -> bool:
+        return self.finished
+
+class ProgressBar:
+    tasks: list[Task]
+    width: int
+    bar_char: str
+    empty_char: str
+
+    def __init__(
+        self: ProgressBar,
+        width: int = 20,
+        bar_char: str = "█",
+        empty_char: str = "─"
+    ) -> None:
+        self.tasks = []
+        self.width = width
+        self.bar_char = bar_char
+        self.empty_char = empty_char
+
+    def add_task(self: ProgressBar, name: str, total: int = 100) -> Task:
+        t: Task = Task(name, total)
+        self.tasks.append(t)
+        return t
+
+    def render_task(self: ProgressBar, task: Task, options: ConsoleOptions) -> str:
+        use_ascii: bool = not options.supports_unicode
+        b_char: str = self.bar_char
+        e_char: str = self.empty_char
+        if use_ascii:
+            b_char = "="
+            e_char = "."
+
+        bar_len: int = self.width
+        if bar_len < 5:
+            bar_len = 5
+
+        pct: int = task.percentage()
+        fill_count: int = 0
+        if task.total > 0:
+            fill_count = (task.completed * bar_len) // task.total
+            if fill_count > bar_len:
+                fill_count = bar_len
+
+        empty_count: int = bar_len - fill_count
+        if empty_count < 0:
+            empty_count = 0
+
+        bar_visual: str = "[" + nox.strings.repeat(b_char, fill_count) + nox.strings.repeat(e_char, empty_count) + "]"
+        stats: str = str(pct) + "% (" + str(task.completed) + "/" + str(task.total) + ")"
+        if task.total <= 0:
+            stats = "(" + str(task.completed) + " items)"
+
+        return bar_visual + " " + stats + " " + task.name
+
+class Spinner:
+    frames_unicode: list[str]
+    frames_ascii: list[str]
+    index: int
+    message: str
+
+    def __init__(self: Spinner, message: str = "") -> None:
+        self.message = message
+        self.frames_unicode = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.frames_ascii = ["|", "/", "-", "\\"]
+        self.index = 0
+
+    def next_frame(self: Spinner, supports_unicode: bool = True) -> str:
+        frame: str = ""
+        if supports_unicode:
+            frame = self.frames_unicode[self.index % len(self.frames_unicode)]
+        else:
+            frame = self.frames_ascii[self.index % len(self.frames_ascii)]
+        self.index = self.index + 1
+        return frame
+
+    def render(self: Spinner, options: ConsoleOptions) -> str:
+        if not options.is_tty:
+            # Plain textual status for CI/non-TTY
+            return "[STATUS] " + self.message
+        frame: str = self.next_frame(options.supports_unicode)
+        if len(self.message) > 0:
+            return frame + " " + self.message
+        return frame

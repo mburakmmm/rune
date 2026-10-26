@@ -1,0 +1,30 @@
+# arguments.nox — Positional argument declarations and type codes.
+
+TYPE_STR: int = 1
+TYPE_INT: int = 2
+TYPE_FLOAT: int = 3
+TYPE_BOOL: int = 4
+
+class Argument:
+    name: str
+    arg_type: int
+    required: bool
+    default_val: str
+    help: str
+    variadic: bool
+
+    def __init__(
+        self: Argument,
+        name: str,
+        arg_type: int = 1,
+        required: bool = True,
+        default_val: str = "",
+        help: str = "",
+        variadic: bool = False
+    ) -> None:
+        self.name = name
+        self.arg_type = arg_type
+        self.required = required
+        self.default_val = default_val
+        self.help = help
+        self.variadic = variadic

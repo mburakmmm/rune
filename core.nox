@@ -1,0 +1,350 @@
+# core.nox — Terminal capabilities, styling primitives, ANSI sanitization and Console context.
+
+import nox.strings
+import nox.os
+from nox.os import OsError
+
+# ASCII Escape Byte
+def esc_code() -> str:
+    return nox.strings.char_from_byte(27)
+
+def reset_code() -> str:
+    return esc_code() + "[0m"
+
+# Standard Color Constants
+COLOR_DEFAULT: str = "39"
+COLOR_BLACK: str = "30"
+COLOR_RED: str = "31"
+COLOR_GREEN: str = "32"
+COLOR_YELLOW: str = "33"
+COLOR_BLUE: str = "34"
+COLOR_MAGENTA: str = "35"
+COLOR_CYAN: str = "36"
+COLOR_WHITE: str = "37"
+COLOR_BRIGHT_BLACK: str = "90"
+COLOR_BRIGHT_RED: str = "91"
+COLOR_BRIGHT_GREEN: str = "92"
+COLOR_BRIGHT_YELLOW: str = "93"
+COLOR_BRIGHT_BLUE: str = "94"
+COLOR_BRIGHT_MAGENTA: str = "95"
+COLOR_BRIGHT_CYAN: str = "96"
+COLOR_BRIGHT_WHITE: str = "97"
+
+BG_DEFAULT: str = "49"
+BG_BLACK: str = "40"
+BG_RED: str = "41"
+BG_GREEN: str = "42"
+BG_YELLOW: str = "43"
+BG_BLUE: str = "44"
+BG_MAGENTA: str = "45"
+BG_CYAN: str = "46"
+BG_WHITE: str = "47"
+
+def resolve_color_code(name: str) -> str:
+    clean: str = nox.strings.lower(nox.strings.trim(name))
+    if clean == "black":
+        return COLOR_BLACK
+    if clean == "red":
+        return COLOR_RED
+    if clean == "green":
+        return COLOR_GREEN
+    if clean == "yellow":
+        return COLOR_YELLOW
+    if clean == "blue":
+        return COLOR_BLUE
+    if clean == "magenta" or clean == "purple":
+        return COLOR_MAGENTA
+    if clean == "cyan":
+        return COLOR_CYAN
+    if clean == "white":
+        return COLOR_WHITE
+    if clean == "gray" or clean == "grey" or clean == "bright_black":
+        return COLOR_BRIGHT_BLACK
+    if clean == "bright_red":
+        return COLOR_BRIGHT_RED
+    if clean == "bright_green":
+        return COLOR_BRIGHT_GREEN
+    if clean == "bright_yellow":
+        return COLOR_BRIGHT_YELLOW
+    if clean == "bright_blue":
+        return COLOR_BRIGHT_BLUE
+    if clean == "bright_magenta":
+        return COLOR_BRIGHT_MAGENTA
+    if clean == "bright_cyan":
+        return COLOR_BRIGHT_CYAN
+    if clean == "bright_white":
+        return COLOR_BRIGHT_WHITE
+    return ""
+
+def resolve_bg_code(name: str) -> str:
+    clean: str = nox.strings.lower(nox.strings.trim(name))
+    if clean == "black":
+        return BG_BLACK
+    if clean == "red":
+        return BG_RED
+    if clean == "green":
+        return BG_GREEN
+    if clean == "yellow":
+        return BG_YELLOW
+    if clean == "blue":
+        return BG_BLUE
+    if clean == "magenta" or clean == "purple":
+        return BG_MAGENTA
+    if clean == "cyan":
+        return BG_CYAN
+    if clean == "white":
+        return BG_WHITE
+    return ""
+
+class Style:
+    def __init__(
+        self: Style,
+        fg: str = "",
+        bg: str = "",
+        bold: bool = False,
+        dim: bool = False,
+        italic: bool = False,
+        underline: bool = False,
+        reverse: bool = False
+    ) -> None:
+        self.fg = fg
+        self.bg = bg
+        self.bold = bold
+        self.dim = dim
+        self.italic = italic
+        self.underline = underline
+        self.reverse = reverse
+
+    def is_plain(self: Style) -> bool:
+        if len(self.fg) > 0:
+            return False
+        if len(self.bg) > 0:
+            return False
+        if self.bold or self.dim or self.italic or self.underline or self.reverse:
+            return False
+        return True
+
+    def to_ansi(self: Style) -> str:
+        if self.is_plain():
+            return ""
+        codes: list[str] = []
+        if self.bold:
+            codes.append("1")
+        if self.dim:
+            codes.append("2")
+        if self.italic:
+            codes.append("3")
+        if self.underline:
+            codes.append("4")
+        if self.reverse:
+            codes.append("7")
+
+        if len(self.fg) > 0:
+            fg_code: str = resolve_color_code(self.fg)
+            if len(fg_code) > 0:
+                codes.append(fg_code)
+            else:
+                codes.append(self.fg)
+
+        if len(self.bg) > 0:
+            bg_code: str = resolve_bg_code(self.bg)
+            if len(bg_code) > 0:
+                codes.append(bg_code)
+            else:
+                codes.append(self.bg)
+
+        if len(codes) == 0:
+            return ""
+        return esc_code() + "[" + nox.strings.join(codes, ";") + "m"
+
+    def apply(self: Style, text: str) -> str:
+        if self.is_plain() or len(text) == 0:
+            return text
+        return self.to_ansi() + text + reset_code()
+
+def strip_ansi(s: str) -> str:
+    n: int = len(s)
+    if n == 0:
+        return ""
+    esc: int = 27
+    out: str = ""
+    i: int = 0
+    while i < n:
+        b: int = nox.strings.byte_at(s, i)
+        if b == esc:
+            i = i + 1
+            if i < n:
+                next_ch: str = s[i]
+                if next_ch == "[":
+                    i = i + 1
+                    while i < n:
+                        c: str = s[i]
+                        cb: int = nox.strings.byte_at(s, i)
+                        if cb >= 64 and cb <= 126:
+                            i = i + 1
+                            break
+                        i = i + 1
+                elif next_ch == "]":
+                    # OSC sequence (ends with BEL or ST)
+                    i = i + 1
+                    while i < n:
+                        cb: int = nox.strings.byte_at(s, i)
+                        if cb == 7: # BEL
+                            i = i + 1
+                            break
+                        if cb == esc and i + 1 < n and s[i + 1] == "\\":
+                            i = i + 2
+                            break
+                        i = i + 1
+                else:
+                    i = i + 1
+        else:
+            out = out + s[i]
+            i = i + 1
+    return out
+
+def sanitize_ansi(s: str) -> str:
+    # Completely strips escape codes and unsafe control characters (0-31 except \n, \r, \t)
+    n: int = len(s)
+    if n == 0:
+        return ""
+    esc: int = 27
+    out: str = ""
+    i: int = 0
+    while i < n:
+        b: int = nox.strings.byte_at(s, i)
+        if b == esc:
+            i = i + 1
+            if i < n:
+                next_ch: str = s[i]
+                if next_ch == "[":
+                    i = i + 1
+                    while i < n:
+                        cb: int = nox.strings.byte_at(s, i)
+                        if cb >= 64 and cb <= 126:
+                            i = i + 1
+                            break
+                        i = i + 1
+                elif next_ch == "]":
+                    i = i + 1
+                    while i < n:
+                        cb: int = nox.strings.byte_at(s, i)
+                        if cb == 7:
+                            i = i + 1
+                            break
+                        if cb == esc and i + 1 < n and s[i + 1] == "\\":
+                            i = i + 2
+                            break
+                        i = i + 1
+                else:
+                    i = i + 1
+        elif b < 32 and b != 10 and b != 13 and b != 9:
+            # Control character rejected for security
+            i = i + 1
+        else:
+            out = out + s[i]
+            i = i + 1
+    return out
+
+def cell_width(s: str) -> int:
+    clean: str = strip_ansi(s)
+    return len(clean)
+
+def get_env_safe(key: str) -> str | None:
+    try:
+        val: str = nox.os.getenv(key)
+        return val
+    except OsError:
+        return None
+
+class ConsoleOptions:
+    def __init__(
+        self: ConsoleOptions,
+        supports_color: bool = True,
+        supports_unicode: bool = True,
+        width: int = 80,
+        height: int = 24,
+        is_tty: bool = True,
+        capture: bool = False
+    ) -> None:
+        self.supports_color = supports_color
+        self.supports_unicode = supports_unicode
+        self.width = width
+        self.height = height
+        self.is_tty = is_tty
+        self.capture = capture
+
+def detect_console_options() -> ConsoleOptions:
+    # 1. Check NO_COLOR (takes high precedence)
+    no_color: str | None = get_env_safe("NO_COLOR")
+    force_color: str | None = get_env_safe("CLICOLOR_FORCE")
+    term: str | None = get_env_safe("TERM")
+    ci: str | None = get_env_safe("CI")
+
+    supports_color: bool = True
+    if no_color is not None:
+        if len(no_color) > 0:
+            supports_color = False
+    else:
+        if force_color is not None:
+            if force_color == "1":
+                supports_color = True
+        else:
+            if term is not None:
+                if term == "dumb":
+                    supports_color = False
+
+    is_tty: bool = True
+    if ci is not None:
+        is_tty = False
+
+    # Default conservative width: 80 cols
+    return ConsoleOptions(supports_color, True, 80, 24, is_tty, False)
+
+class Console:
+    options: ConsoleOptions
+    buffer: str
+
+    def __init__(self: Console, options: ConsoleOptions | None = None) -> None:
+        if options is not None:
+            self.options = options
+        else:
+            self.options = detect_console_options()
+        self.buffer = ""
+
+    def print(self: Console, text: str = "") -> None:
+        if not self.options.supports_color:
+            text = strip_ansi(text)
+        if self.options.capture:
+            self.buffer = self.buffer + text + "\n"
+        else:
+            print(text)
+
+    def print_styled(self: Console, text: str, style: Style) -> None:
+        if self.options.supports_color:
+            self.print(style.apply(text))
+        else:
+            self.print(text)
+
+    def write(self: Console, text: str) -> None:
+        if not self.options.supports_color:
+            text = strip_ansi(text)
+        if self.options.capture:
+            self.buffer = self.buffer + text
+        else:
+            # nox doesn't have sys.stdout.write, print writes with newline.
+            # In capture mode write appends directly.
+            self.buffer = self.buffer + text
+
+    def get_captured(self: Console) -> str:
+        return self.buffer
+
+    def clear_captured(self: Console) -> None:
+        self.buffer = ""
+
+    def set_color(self: Console, enabled: bool) -> None:
+        self.options.supports_color = enabled
+
+    def set_width(self: Console, width: int) -> None:
+        if width > 0:
+            self.options.width = width
