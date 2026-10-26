@@ -35,23 +35,48 @@ class TerminalSize:
         self.cols = cols
         self.rows = rows
 
+class TerminalCapabilities:
+    is_tty: bool
+    supports_ansi: bool
+    supports_truecolor: bool
+    color_depth: int  # 0: monochrome, 16: ANSI, 256: 8-bit, 16777216: truecolor
+
+    def __init__(self: TerminalCapabilities, is_tty: bool, supports_ansi: bool, supports_truecolor: bool, color_depth: int) -> None:
+        self.is_tty = is_tty
+        self.supports_ansi = supports_ansi
+        self.supports_truecolor = supports_truecolor
+        self.color_depth = color_depth
+
+class TerminalSession:
+    # Oturum bazlı güvenli durum yönetimi (nested raw-mode ve merkezi restore)
+    is_raw: bool
+    echo_enabled: bool
+
+    def __init__(self: TerminalSession) -> None: ...
+    def enter_raw_mode(self: TerminalSession) -> None: ...
+    def leave_raw_mode(self: TerminalSession) -> None: ...
+    def restore(self: TerminalSession) -> None: ...
+
 # 1. TTY & Yetenek Algılama
 def is_tty(fd: int = 1) -> bool: ...
+def get_capabilities() -> TerminalCapabilities: ...
 
 # 2. Terminal Boyutu (Sütun x Satır)
 def get_size() -> TerminalSize: ...
 
-# 3. Raw Mod (Karakter Karakter Anlık Okuma & No-Echo)
+# 3. Raw Mod (Global Kolaylık API'si)
 def enable_raw_mode() -> None: ...
 def disable_raw_mode() -> None: ...
 def is_raw_mode() -> bool: ...
+def restore_state() -> None: ...
 
 # 4. Parola / Echo Kontrolü
 def set_echo(enabled: bool) -> None: ...
 
 # 5. Non-Blocking / Zaman Aşımlı Ham Girdi Okuma
 def poll_input(timeout_ms: int) -> bool: ...
-def read_raw(max_bytes: int = 256) -> str: ...
+def read_raw(max_bytes: int = 256) -> bytes: ...
+def read_raw_str(max_bytes: int = 256) -> str: ...
 
 # 6. Satır Başı Eklemeden Ham Stdout Çıktısı & Boşaltma
 def write_raw(content: str) -> None: ...
@@ -201,6 +226,72 @@ pub export fn nox_terminal_flush_raw() void {
     // libc veya unbuffered flush
 }
 ```
+
+---
+
+### 3.5. Bayt Tabanlı Okuma ve Parçalı UTF-8 Yönetimi (`bytes` vs `str`)
+
+Terminal akışlarında çok baytlı UTF-8 karakterleri (örneğin 3 baytlık `€` = `0xE2 0x82 0xAC` veya 4 baytlık emojiler `🦀` = `0xF0 0x9F 0xA6 0x80`), iki ayrı işletim sistemi `read()` çağrısına bölünebilir.
+
+Eğer çalışma zamanı ham veriyi zorunlu olarak doğrudan `str` nesnesine dönüştürmeye çalışırsa:
+1. Parçalı bayt dizisi geçersiz UTF-8 hatası üretebilir (`Utf8Error`).
+2. Veya derleyici geçersiz baytları `\uFFFD` (replacement char) ile değiştirebilir ve karakter bozulur.
+
+**Çözüm:**
+- Runtime seviyesinde ham baytları dönen `read_raw(max_bytes: int = 256) -> bytes` (veya `list[int]`) sunulmalıdır.
+- Kolaylık için tam satır veya geçerli dizgilerde `read_raw_str()` da sağlanabilir.
+- Rune tarafındaki `KeyDecoder` bu baytları durum makineli bir UTF-8 tamponunda toplayarak birleştirir.
+
+---
+
+### 3.6. Oturum Nesnesi (`TerminalSession`) ve Merkezi `restore_state()`
+
+Raw mode bayraklarının tek bir global değişkende tutulması yerine, oturum nesnesi (`TerminalSession`) veya güvenli sayaç tabanlı bir yapı (`ref-counted raw mode`) önerilir:
+
+```zig
+pub const TerminalSession = struct {
+    orig_termios: posix.termios,
+    is_active: bool,
+
+    pub fn init() !TerminalSession {
+        const fd = posix.STDIN_FILENO;
+        const orig = try posix.tcgetattr(fd);
+        return TerminalSession{
+            .orig_termios = orig,
+            .is_active = false,
+        };
+    }
+
+    pub fn enter(self: *TerminalSession) !void {
+        if (self.is_active) return;
+        // raw mod bayraklarını uygula
+        self.is_active = true;
+    }
+
+    pub fn restore(self: *TerminalSession) void {
+        if (!self.is_active) return;
+        _ = posix.tcsetattr(posix.STDIN_FILENO, .FLUSH, self.orig_termios) catch {};
+        self.is_active = false;
+    }
+};
+
+// Acil durum kurtarma (atexit / panic handler)
+pub export fn nox_terminal_restore_state_raw() void {
+    // Tüm aktif terminal oturumlarını orijinal termios'a döndürür,
+    // cursor'ı gösterir (\x1b[?25h) ve alt-screen'den çıkar (\x1b[?1049l).
+}
+```
+
+---
+
+### 3.7. Zig Sürüm Uyumluluğu & Windows VT Notları
+
+1. **Zig Sürümü:** Zig 0.12+ sürümlerinde POSIX çağrıları `std.posix` ad alanına taşınmıştır. Eski Zig sürümleri (0.11 ve öncesi) için `std.os` kullanılır.
+2. **Windows Konsol Konfigürasyonu:**
+   - Windows 10+ konsolunda ANSI kaçış kodlarının çalışması için:
+     - Girdi için: `ENABLE_VIRTUAL_TERMINAL_INPUT (0x0200)`
+     - Çıktı için: `ENABLE_VIRTUAL_TERMINAL_PROCESSING (0x0004)`
+   - Bu bayrakların `SetConsoleMode` ile aktif edilmesi gerekir.
 
 ---
 

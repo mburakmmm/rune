@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.5] - 2026-10-27
+
+### Fixed & Hardened (GPT 5.6 Audit Hardening for Atomic Cell Transactions & Invariant Validation)
+- **[P1] Atomic Cell Transaction Model (`ScreenBuffer.set`)**:
+  - Implemented pre-flight transaction verification for all writes. If writing to a cell would orphan an external wide-character or modify a continuation cell outside `clip_rect`, the operation is cleanly rejected without side effects.
+  - Guarantees both invariants simultaneously:
+    1. Cells outside `clip_rect` are never modified.
+    2. Buffer never contains half-written or orphaned wide characters.
+- **[P1] Explicit Invariant Verification (`ScreenBuffer.validate_invariants`)**:
+  - Added programmatic integrity validator ensuring every `width == 2` cell is followed by a `width == 0` cell, and every `width == 0` cell is preceded by a `width == 2` cell.
+- **[Docs] Expanded `NOX_LIMITATIONS.md`**:
+  - Added byte-based input specifications (`read_raw -> bytes`) for fragmented multi-byte UTF-8 sequences.
+  - Added `TerminalSession` object pattern and `restore_state()` for robust nested terminal cleanup.
+  - Added `get_capabilities()` API specification.
+
+---
+
 ## [1.4.4] - 2026-10-26
 
 ### Fixed & Hardened (GPT 5.6 Audit Hardening for Boundary Atomization, Scoped Clips, and Single-Tick Accounting)

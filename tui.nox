@@ -116,6 +116,29 @@ class ScreenBuffer:
         idx: int = y * self.width + x
         return self.cells[idx]
 
+    def validate_invariants(self: ScreenBuffer) -> bool:
+
+        y: int = 0
+        while y < self.height:
+            x: int = 0
+            while x < self.width:
+                c: Cell = self.get(x, y)
+                if c.width == 2:
+                    if x + 1 >= self.width:
+                        return False
+                    c_next: Cell = self.get(x + 1, y)
+                    if c_next.width != 0:
+                        return False
+                elif c.width == 0:
+                    if x == 0:
+                        return False
+                    c_prev: Cell = self.get(x - 1, y)
+                    if c_prev.width != 2:
+                        return False
+                x = x + 1
+            y = y + 1
+        return True
+
     def set(self: ScreenBuffer, x: int, y: int, char: str, style: Style | None = None) -> None:
 
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
@@ -129,55 +152,57 @@ class ScreenBuffer:
         if w <= 0:
             w = 1
 
-        # Case 1: If target cell is continuation of a previous wide char (width == 0),
-        # writing over it breaks the left half at (x - 1)! Clean the left half to space only if inside clip_rect:
+        # Pre-flight Check: Atomic Transaction & Boundary Invariant Verification
+        # 1. Left Atomicity:
+        # If target cell (x, y) is currently a continuation cell (width == 0),
+        # its parent wide-character is at (x - 1). If (x - 1) is OUTSIDE the active clip rect,
+        # we cannot clear (x - 1) without modifying outside clip, and we cannot overwrite (x)
+        # without orphaning the wide character at (x - 1).
+        # Therefore, writing to an external continuation cell must be REJECTED!
+        if self.cells[idx].width == 0 and x > 0:
+            if cr != None:
+                if not cr.contains(x - 1, y):
+                    return
+
+        # 2. Right Atomicity:
+        if w == 1:
+            # Overwriting a wide char with a narrow char requires clearing its continuation at (x + 1)
+            if self.cells[idx].width == 2 and x + 1 < self.width:
+                if cr != None:
+                    if not cr.contains(x + 1, y):
+                        return
+        elif w == 2:
+            # New wide char requires both x and (x + 1) to fit in buffer
+            if x + 1 >= self.width:
+                return
+            # Both x and (x + 1) must be strictly inside the active clip rect
+            if cr != None:
+                if not cr.contains(x + 1, y):
+                    return
+            # If cell at (x + 1) is currently a wide char with continuation at (x + 2):
+            if self.cells[y * self.width + (x + 1)].width == 2 and x + 2 < self.width:
+                if cr != None:
+                    if not cr.contains(x + 2, y):
+                        return
+
+        # All pre-flight checks passed! Apply atomic mutations:
+        # Step A: Clean previous wide char left-half if this cell was continuation
         if self.cells[idx].width == 0 and x > 0:
             prev_idx: int = y * self.width + (x - 1)
             if self.cells[prev_idx].width == 2:
-                can_clear_prev: bool = True
-                if cr != None:
-                    if not cr.contains(x - 1, y):
-                        can_clear_prev = False
-                if can_clear_prev:
-                    self.cells[prev_idx] = Cell(" ", None, 1)
+                self.cells[prev_idx] = Cell(" ", None, 1)
 
-        # Case 2: If target cell is a wide char (width == 2),
-        # writing over it breaks the continuation cell at (x + 1)! Clean continuation to space only if inside clip_rect:
+        # Step B: Clean previous continuation if this cell was a wide char
         if self.cells[idx].width == 2 and x + 1 < self.width:
             next_idx: int = y * self.width + (x + 1)
             if self.cells[next_idx].width == 0:
-                can_clear_next: bool = True
-                if cr != None:
-                    if not cr.contains(x + 1, y):
-                        can_clear_next = False
-                if can_clear_next:
-                    self.cells[next_idx] = Cell(" ", None, 1)
+                self.cells[next_idx] = Cell(" ", None, 1)
 
-        # Case 3: If the new character to be written is wide (width == 2):
+        # Step C: Write new character
         if w == 2:
-            # Cannot fit wide char on the very last column
-            if x + 1 >= self.width:
-                self.cells[idx] = Cell(" ", None, 1)
-                return
-
-            # Check if continuation cell (x + 1) leaks outside the active clip rect
-            if cr != None:
-                if not cr.contains(x + 1, y):
-                    # Wide character cannot fit within clip rect without leaking into x+1!
-                    # Place a single space at x to keep clipping bounds strictly preserved
-                    self.cells[idx] = Cell(" ", None, 1)
-                    return
-
-            # Check if cell at (x + 1) is itself a wide char or continuation
             next_idx2: int = y * self.width + (x + 1)
             if self.cells[next_idx2].width == 2 and x + 2 < self.width:
-                can_clear_cont: bool = True
-                if cr != None:
-                    if not cr.contains(x + 2, y):
-                        can_clear_cont = False
-                if can_clear_cont:
-                    self.cells[y * self.width + (x + 2)] = Cell(" ", None, 1)
-
+                self.cells[y * self.width + (x + 2)] = Cell(" ", None, 1)
             self.cells[idx] = Cell(char, style, 2)
             self.cells[next_idx2] = Cell("", style, 0)
         else:

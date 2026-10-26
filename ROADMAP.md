@@ -32,6 +32,7 @@
 | **Phase 10.2: Batching & Clipping** | `v1.4.2` | Event batching, global 2D clipping, buffer caps, setup protection | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
 | **Phase 10.3: Precision Clipping & Delays** | `v1.4.3` | Left-clip offsets, wide Unicode boundary integrity, clip stack, escape delay | **Completed** | `tui_widgets_test`, `tui_app_test`, `tui_layout_test` (22 suites) |
 | **Phase 10.4: Boundary Preservation** | `v1.4.4` | External wide char atomization boundary protection, scoped clips, single tick loop | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
+| **Phase 10.5: Atomic Cell Transactions** | `v1.4.5` | Atomic cell pre-flight verification, invariant validation, `NOX_LIMITATIONS.md` expansion | **Completed** | `tui_widgets_test` (22 suites) |
 
 ---
 
@@ -415,6 +416,18 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - `AppRunner.render_frame()` wraps `app.view(frame)` in `try ... finally: frame.clear_clip()` ensuring no aborted widget rendering leaves active clips behind.
 - [x] **Single-Tick Loop Accounting**:
   - Eliminated duplicate `check_esc_timeout` call in interactive loop. Delays progress exactly once per frame tick.
+
+---
+
+### 🛡️ v1.4.5 — Atomic Cell Transactions & Invariant Validation (Completed)
+**Goal:** Guarantee complete 2D Unicode integrity with pre-flight atomic transactions in `ScreenBuffer.set`, preventing any orphaned wide characters or boundary leaks.
+
+- [x] **Atomic Pre-Flight Write Verification**:
+  - `ScreenBuffer.set()` validates before mutating: if a write would orphan an external wide-character or modify a continuation cell outside `clip_rect`, the operation is cleanly rejected without side effects.
+- [x] **Programmatic Invariant Verification**:
+  - Added `ScreenBuffer.validate_invariants()` checking that every `width == 2` cell is followed by a `width == 0` cell, and every `width == 0` cell is preceded by a `width == 2` cell.
+- [x] **Expanded `NOX_LIMITATIONS.md`**:
+  - Documented `read_raw -> bytes`, `TerminalSession`, `restore_state()`, and `get_capabilities()` for the Nox compiler runtime roadmap.
 
 ---
 

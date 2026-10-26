@@ -254,28 +254,52 @@ if c3 != None:
 buf_stack.pop_clip()
 nox.test.assert_true(buf_stack.get_clip() == None, "popping all clips clears clip_rect")
 
-# 13. External Wide Character Boundary Preservation (GPT 5.6 Scenario)
+# 13. External Wide Character Boundary Preservation & Invariant Validation (GPT 5.6 Scenarios)
 # Scenario A: Left-neighbor outside clip
 buf_ext: ScreenBuffer = ScreenBuffer(10, 2)
 buf_ext.set(4, 0, "界")
 nox.test.assert_eq_str(buf_ext.get(4, 0).char, "界", "cell 4 is wide char")
 nox.test.assert_eq_int(buf_ext.get(5, 0).width, 0, "cell 5 is continuation")
+nox.test.assert_true(buf_ext.validate_invariants(), "initial invariants valid")
 
 # Activate clip rect covering columns 5..9 (cell 4 is strictly outside!)
 buf_ext.set_clip(Rect(5, 0, 5, 1))
-# Write inside clip rect at cell 5
+# Attempt to write inside clip rect at cell 5:
+# Must be atomically rejected because mutating cell 5 would orphan cell 4 outside clip!
 buf_ext.set(5, 0, "A")
-# Cell 4 (outside clip) must be completely untouched and preserved!
 nox.test.assert_eq_str(buf_ext.get(4, 0).char, "界", "wide char at cell 4 outside clip rect is preserved")
-nox.test.assert_eq_str(buf_ext.get(5, 0).char, "A", "cell 5 inside clip rect receives A")
+nox.test.assert_eq_int(buf_ext.get(5, 0).width, 0, "cell 5 remains continuation to avoid orphaning cell 4")
+nox.test.assert_true(buf_ext.validate_invariants(), "invariants hold after rejected write")
 
 # Scenario B: Right-neighbor outside clip
 buf_ext_r: ScreenBuffer = ScreenBuffer(10, 2)
 buf_ext_r.set(4, 0, "界")
 # Activate clip rect covering columns 0..4 (cell 5 is strictly outside!)
 buf_ext_r.set_clip(Rect(0, 0, 5, 1))
+# Attempt to overwrite cell 4 with narrow char:
+# Must be atomically rejected because clearing continuation at cell 5 would write outside clip!
 buf_ext_r.set(4, 0, "B")
-nox.test.assert_eq_str(buf_ext_r.get(4, 0).char, "B", "cell 4 inside clip rect receives B")
-nox.test.assert_eq_int(buf_ext_r.get(5, 0).width, 0, "cell 5 outside clip rect was not mutated")
+nox.test.assert_eq_str(buf_ext_r.get(4, 0).char, "界", "cell 4 remains wide char")
+nox.test.assert_eq_int(buf_ext_r.get(5, 0).width, 0, "cell 5 continuation remains preserved outside clip")
+nox.test.assert_true(buf_ext_r.validate_invariants(), "invariants hold after rejected right-boundary write")
+
+# Scenario C: Wide character overwriting wide character whose continuation is outside clip
+buf_ext_c: ScreenBuffer = ScreenBuffer(10, 2)
+buf_ext_c.set(6, 0, "界") # columns 6 and 7
+buf_ext_c.set_clip(Rect(5, 0, 2, 1)) # columns 5 and 6 (column 7 is outside clip)
+# Attempt to write wide char at column 5 (occupies 5 and 6):
+# Overwriting column 6 would orphan continuation at column 7!
+buf_ext_c.set(5, 0, "世")
+nox.test.assert_eq_str(buf_ext_c.get(6, 0).char, "界", "column 6 remains wide char")
+nox.test.assert_eq_int(buf_ext_c.get(7, 0).width, 0, "column 7 remains continuation")
+nox.test.assert_true(buf_ext_c.validate_invariants(), "invariants hold without orphaned continuation")
+
+# Scenario D: Valid wide character completely within clip
+buf_valid: ScreenBuffer = ScreenBuffer(10, 2)
+buf_valid.set_clip(Rect(1, 0, 6, 1))
+buf_valid.set(2, 0, "世")
+nox.test.assert_eq_str(buf_valid.get(2, 0).char, "世", "wide char written inside clip")
+nox.test.assert_eq_int(buf_valid.get(3, 0).width, 0, "continuation cell written inside clip")
+nox.test.assert_true(buf_valid.validate_invariants(), "invariants hold for valid write")
 
 print("tui_widgets_test passed")
