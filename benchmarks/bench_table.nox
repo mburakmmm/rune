@@ -1,0 +1,32 @@
+# benchmarks/bench_table.nox — Benchmarking table formatting with 10, 100, and 1000 rows.
+
+import nox.time
+import core
+from core import ConsoleOptions
+import table
+from table import Table
+
+def bench_table(row_count: int) -> int:
+    tbl: Table = Table("Benchmark " + str(row_count) + " Rows")
+    tbl.add_column("ID", "right")
+    tbl.add_column("Package", "left")
+    tbl.add_column("Description", "left")
+    tbl.add_column("Score", "right")
+
+    r: int = 0
+    while r < row_count:
+        tbl.add_row([str(r), "pkg_" + str(r), "Automated performance benchmark row " + str(r), "99.8"])
+        r = r + 1
+
+    opts: ConsoleOptions = ConsoleOptions(False, True, 120, 24, False, True)
+    start_ms: int = nox.time.now_ms()
+    output: str = tbl.render(opts)
+    end_ms: int = nox.time.now_ms()
+
+    duration: int = end_ms - start_ms
+    print("Table " + str(row_count) + " rows: " + str(duration) + " ms (output length: " + str(len(output)) + ")")
+    return duration
+
+bench_table(10)
+bench_table(100)
+bench_table(1000)

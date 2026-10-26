@@ -6,7 +6,7 @@ from rune import Console, Style, Rule, Panel, Table, Tree, TreeNode, ProgressBar
 def run_showcase(console: Console) -> None:
     # 1. Title Banner
     console.print("")
-    rule_top: Rule = Rule("Rune 0.7.0 Showcase", "─", "center", Style("cyan", "", True))
+    rule_top: Rule = Rule("Rune 0.8.0 Showcase", "─", "center", Style("cyan", "", True))
     console.print(rule_top.render(console.options))
     console.print("")
 
@@ -80,7 +80,7 @@ cmd.add_option("completion", "", TYPE_STR, False, False, "", "Generate shell com
 showcase_sub: Command = Command("demo", "Run interactive visual showcase")
 cmd.add_subcommand(showcase_sub)
 
-app: CliApp = CliApp(cmd, "0.7.0")
+app: CliApp = CliApp(cmd, "0.8.0")
 res: CliResult = app.parse([])
 
 # If run directly without args, show showcase

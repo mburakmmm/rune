@@ -1,0 +1,38 @@
+# benchmarks/bench_cli.nox — Benchmarking CLI argument parsing with 10, 100, and 1000 options.
+
+import nox.time
+import arguments
+from arguments import TYPE_STR, TYPE_INT
+import options
+from options import Option
+import cli
+from cli import Command, CliApp, CliResult
+
+def bench_cli(arg_count: int) -> int:
+    cmd: Command = Command("bench_app", "CLI Benchmark App")
+    i: int = 0
+    while i < arg_count:
+        cmd.add_option("opt" + str(i), "", TYPE_STR, False, False, "default", "Help for option " + str(i))
+        i = i + 1
+
+    app: CliApp = CliApp(cmd, "1.0.0")
+
+    # Prepare command line input tokens
+    tokens: list[str] = []
+    j: int = 0
+    while j < arg_count:
+        tokens.append("--opt" + str(j))
+        tokens.append("val" + str(j))
+        j = j + 1
+
+    start_ms: int = nox.time.now_ms()
+    res: CliResult = app.parse(tokens)
+    end_ms: int = nox.time.now_ms()
+
+    duration: int = end_ms - start_ms
+    print("CLI " + str(arg_count) + " options: " + str(duration) + " ms (success: " + str(res.is_success()) + ")")
+    return duration
+
+bench_cli(10)
+bench_cli(100)
+bench_cli(1000)

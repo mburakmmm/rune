@@ -1,0 +1,57 @@
+# benchmarks/bench_render.nox — Benchmarking Markdown, Syntax, and Tree rendering.
+
+import nox.time
+import core
+from core import ConsoleOptions
+import syntax
+from syntax import Syntax
+import markdown
+from markdown import Markdown
+import tree
+from tree import Tree, TreeNode
+
+opts: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, True)
+
+# 1. Benchmark Syntax Highlighting
+code_block: str = "def compute_factorial(n: int) -> int:\n    if n <= 1:\n        return 1\n    return n * compute_factorial(n - 1)\n"
+full_code: str = ""
+c: int = 0
+while c < 200:
+    full_code = full_code + code_block
+    c = c + 1
+
+syn: Syntax = Syntax(full_code, "nox", True)
+start_syn: int = nox.time.now_ms()
+syn_out: str = syn.render(opts)
+end_syn: int = nox.time.now_ms()
+print("Syntax 800 lines: " + str(end_syn - start_syn) + " ms")
+
+# 2. Benchmark Markdown Parsing
+md_snippet: str = "# Heading 1\n## Heading 2\n- Item 1\n- Item 2\n> Blockquote text\n```nox\nx: int = 10\n```\n"
+full_md: str = ""
+m: int = 0
+while m < 100:
+    full_md = full_md + md_snippet
+    m = m + 1
+
+md_obj: Markdown = Markdown(full_md)
+start_md: int = nox.time.now_ms()
+md_out: str = md_obj.render(opts)
+end_md: int = nox.time.now_ms()
+print("Markdown 700 lines: " + str(end_md - start_md) + " ms")
+
+# 3. Benchmark Tree with 1000 nodes
+tr: Tree = Tree("root")
+t_idx: int = 0
+while t_idx < 100:
+    branch: TreeNode = tr.add("branch_" + str(t_idx))
+    sub_idx: int = 0
+    while sub_idx < 10:
+        branch.add("leaf_" + str(sub_idx))
+        sub_idx = sub_idx + 1
+    t_idx = t_idx + 1
+
+start_tree: int = nox.time.now_ms()
+tree_out: str = tr.render(opts)
+end_tree: int = nox.time.now_ms()
+print("Tree 1000 nodes: " + str(end_tree - start_tree) + " ms")

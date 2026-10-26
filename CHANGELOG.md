@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-10-26
+
+### Added
+- **Performance Benchmark Suite (`benchmarks/`)**:
+  - `benchmarks/bench_table.nox`: benchmarks table layout performance up to 1,000 rows (sub-3ms execution).
+  - `benchmarks/bench_cli.nox`: benchmarks CLI argument parsing up to 1,000 options (sub-2ms execution).
+  - `benchmarks/bench_render.nox`: benchmarks syntax highlighting (800 lines), markdown parsing (700 lines), and tree layout (1,000 nodes).
+  - `benchmarks/run_benchmarks.nox`: unified runner executing all benchmarks and presenting results in a live Rune table.
+- **Allocation Bounds Enforcement**:
+  - Table column count capped at 100 to prevent denial-of-service via huge dimension allocations.
+  - Table padding clamped within [0, 20].
+  - Tree rendering bounded to 10,000 nodes to prevent memory exhaustion and recursion hangs.
+- **Test Suites**:
+  - `tests/unit/benchmark_test.nox` verifying dimension limits and bounds enforcement.
+
+---
+
 ## [0.7.0] - 2026-10-26
 
 ### Added

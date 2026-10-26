@@ -92,6 +92,17 @@ class Table:
         if col_count == 0:
             return ""
 
+        # Allocation bounds: limit column count to prevent denial of service
+        if col_count > 100:
+            col_count = 100
+
+        # Bound padding
+        pad: int = self.padding
+        if pad < 0:
+            pad = 0
+        if pad > 20:
+            pad = 20
+
         # Calculate width of each column
         col_widths: list[int] = []
         c: int = 0
@@ -158,7 +169,7 @@ class Table:
             h = "─"
             v = "│"
 
-        pad_str: str = nox.strings.repeat(" ", self.padding)
+        pad_str: str = nox.strings.repeat(" ", pad)
         lines: list[str] = []
 
         # 1. Top border
@@ -166,7 +177,7 @@ class Table:
             top_parts: list[str] = []
             ci: int = 0
             while ci < col_count:
-                top_parts.append(nox.strings.repeat(h, col_widths[ci] + (self.padding * 2)))
+                top_parts.append(nox.strings.repeat(h, col_widths[ci] + (pad * 2)))
                 ci = ci + 1
             lines.append(tl + nox.strings.join(top_parts, tm) + tr)
 
@@ -187,7 +198,7 @@ class Table:
             sep_parts: list[str] = []
             ci3: int = 0
             while ci3 < col_count:
-                sep_parts.append(nox.strings.repeat(h, col_widths[ci3] + (self.padding * 2)))
+                sep_parts.append(nox.strings.repeat(h, col_widths[ci3] + (pad * 2)))
                 ci3 = ci3 + 1
             if self.border_style == "minimal":
                 lines.append(h + nox.strings.join(sep_parts, h) + h)
@@ -242,7 +253,7 @@ class Table:
             bot_parts: list[str] = []
             ci6: int = 0
             while ci6 < col_count:
-                bot_parts.append(nox.strings.repeat(h, col_widths[ci6] + (self.padding * 2)))
+                bot_parts.append(nox.strings.repeat(h, col_widths[ci6] + (pad * 2)))
                 ci6 = ci6 + 1
             lines.append(bl + nox.strings.join(bot_parts, bm) + br)
 

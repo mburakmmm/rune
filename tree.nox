@@ -68,8 +68,14 @@ class Tree:
         lines: list[str] = []
         stack: list[TreeItem] = []
         stack.append(TreeItem(self.root, "", True, True))
+        visited_nodes: int = 0
 
         while len(stack) > 0:
+            if visited_nodes >= 10000:
+                lines.append("... (max tree nodes limit reached)")
+                break
+            visited_nodes = visited_nodes + 1
+
             item: TreeItem = stack.pop()
             node: TreeNode = item.node
 

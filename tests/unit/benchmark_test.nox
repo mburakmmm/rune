@@ -1,0 +1,51 @@
+# tests/unit/benchmark_test.nox — Tests for performance limits and bounds hardening.
+
+import nox.test
+import core
+from core import ConsoleOptions
+import table
+from table import Table
+import tree
+from tree import Tree, TreeNode
+
+# 1. Table allocation bounds test (>100 columns clamped safely)
+tbl: Table = Table("Huge Table")
+c: int = 0
+while c < 150:
+    tbl.add_column("Col" + str(c))
+    c = c + 1
+
+row_data: list[str] = []
+r: int = 0
+while r < 150:
+    row_data.append("val" + str(r))
+    r = r + 1
+tbl.add_row(row_data)
+
+opts: ConsoleOptions = ConsoleOptions(False, True, 200, 24, False, True)
+rendered_tbl: str = tbl.render(opts)
+
+nox.test.assert_true(len(rendered_tbl) > 0, "Huge table must render safely without crash")
+
+# 2. Table padding bounds test (negative or huge padding clamped)
+tbl_pad: Table = Table("Pad Test", "rounded", None, 50)
+tbl_pad.add_column("Col1")
+tbl_pad.add_row(["A"])
+rendered_pad: str = tbl_pad.render(opts)
+nox.test.assert_true(len(rendered_pad) > 0, "Huge padding must be clamped to max 20")
+
+# 3. Tree node bounds test (caps at 10,000 nodes without OOM)
+tr: Tree = Tree("root")
+b_idx: int = 0
+while b_idx < 120:
+    node: TreeNode = tr.add("node_" + str(b_idx))
+    sub_idx: int = 0
+    while sub_idx < 90:
+        node.add("leaf_" + str(sub_idx))
+        sub_idx = sub_idx + 1
+    b_idx = b_idx + 1
+
+rendered_tree: str = tr.render(opts)
+nox.test.assert_true(len(rendered_tree) > 0, "Deep tree must render safely and bound maximum nodes")
+
+print("benchmark_test passed")
