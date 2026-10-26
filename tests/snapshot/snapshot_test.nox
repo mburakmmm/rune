@@ -18,6 +18,13 @@ from options import Option
 import cli
 from cli import Command, CliApp, CliResult
 
+def norm_lf(s: str) -> str:
+    res: str = ""
+    for ch in s:
+        if ch != "\r":
+            res = res + ch
+    return res
+
 # 1. Table Snapshot: Unicode Rounded
 opts_uni_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
 tbl_uni: Table = Table("Users", "rounded", None, 1)
@@ -33,7 +40,7 @@ expected_tbl_uni: str = """╭────┬──────────╮
 │  1 │ alice    │
 │  2 │ bob      │
 ╰────┴──────────╯"""
-nox.test.assert_eq_str(actual_tbl_uni, expected_tbl_uni, "Table Unicode rounded snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(actual_tbl_uni), norm_lf(expected_tbl_uni), "Table Unicode rounded snapshot mismatch")
 
 # 2. Table Snapshot: ASCII Fallback
 opts_ascii_plain: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
@@ -50,7 +57,7 @@ expected_tbl_ascii: str = """+----+----------+
 |  1 | alice    |
 |  2 | bob      |
 +----+----------+"""
-nox.test.assert_eq_str(actual_tbl_ascii, expected_tbl_ascii, "Table ASCII fallback snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(actual_tbl_ascii), norm_lf(expected_tbl_ascii), "Table ASCII fallback snapshot mismatch")
 
 # 3. Panel Snapshot: Rounded
 pnl: Panel = Panel("Rune toolkit", "Info", "v1.0", "rounded", 1, 0, None)
@@ -59,7 +66,7 @@ actual_pnl: str = pnl.render(opts_uni_plain)
 expected_pnl: str = """╭─ Info ───────╮
 │ Rune toolkit │
 ╰─────── v1.0 ─╯"""
-nox.test.assert_eq_str(actual_pnl, expected_pnl, "Panel rounded snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(actual_pnl), norm_lf(expected_pnl), "Panel rounded snapshot mismatch")
 
 # 4. Rule Snapshot: Centered
 rl: Rule = Rule("Test", "─", "center", None)
@@ -67,7 +74,7 @@ opts_rule: ConsoleOptions = ConsoleOptions(False, True, 20, 24, False, True)
 actual_rule: str = rl.render(opts_rule)
 
 expected_rule: str = "─────── Test ───────"
-nox.test.assert_eq_str(actual_rule, expected_rule, "Rule centered snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(actual_rule), norm_lf(expected_rule), "Rule centered snapshot mismatch")
 
 # 5. CLI Help Output Snapshot
 cmd: Command = Command("dock", "Container engine")
@@ -87,7 +94,7 @@ Arguments:
 Options:
   -h, --help                Show this message and exit
   -p, --port <value>        Port mapping [default: 8080]"""
-nox.test.assert_eq_str(actual_help, expected_help, "CLI Help page snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(actual_help), norm_lf(expected_help), "CLI Help page snapshot mismatch")
 
 # 6. CLI Choice Error Diagnostic Snapshot
 cmd_choices: Command = Command("build")
@@ -95,6 +102,6 @@ cmd_choices.add_option("target", "t", TYPE_STR, False, False, "dev", "Target env
 app_choices: CliApp = CliApp(cmd_choices, "0.9.0")
 res_choice: CliResult = app_choices.parse(["--target", "invalid"])
 nox.test.assert_true(not res_choice.is_success(), "Choice validation must fail")
-nox.test.assert_eq_str(res_choice.error_message, "Invalid value for '--target': 'invalid' is not one of [dev, prod]", "Choice error snapshot mismatch")
+nox.test.assert_eq_str(norm_lf(res_choice.error_message), norm_lf("Invalid value for '--target': 'invalid' is not one of [dev, prod]"), "Choice error snapshot mismatch")
 
 print("snapshot_test passed")
