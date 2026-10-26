@@ -31,6 +31,7 @@
 | **Phase 10.1: TUI Hardening** | `v1.4.1` | Try-finally recovery, input queue, stateful key decoder, frame clearing | **Completed** | `tui_app_test` (22 suites) |
 | **Phase 10.2: Batching & Clipping** | `v1.4.2` | Event batching, global 2D clipping, buffer caps, setup protection | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
 | **Phase 10.3: Precision Clipping & Delays** | `v1.4.3` | Left-clip offsets, wide Unicode boundary integrity, clip stack, escape delay | **Completed** | `tui_widgets_test`, `tui_app_test`, `tui_layout_test` (22 suites) |
+| **Phase 10.4: Boundary Preservation** | `v1.4.4` | External wide char atomization boundary protection, scoped clips, single tick loop | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
 
 ---
 
@@ -402,6 +403,18 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - `AppRunner` introduces configurable `esc_timeout_ms = 50` and elapsed time tracking.
   - Fragmented escape sequences split across chunks complete seamlessly without generating spurious standalone `ESC` events.
   - Standalone `ESC` keys flush only after the 50ms escape delay expires or upon explicit flush.
+
+---
+
+### 🛡️ v1.4.4 — External Boundary Atomization & Scoped Clips (Completed)
+**Goal:** Guarantee complete immutability for buffer cells lying outside active clipping regions, add scoped clip error recovery, and eliminate duplicate tick calculations.
+
+- [x] **External Boundary Cell Protection**:
+  - `ScreenBuffer.set()` checks `cr.contains` before clearing adjacent continuation or left-half cells (`x - 1`, `x + 1`, `x + 2`). Cells outside `clip_rect` are never mutated.
+- [x] **Scoped Frame Try-Finally Protection**:
+  - `AppRunner.render_frame()` wraps `app.view(frame)` in `try ... finally: frame.clear_clip()` ensuring no aborted widget rendering leaves active clips behind.
+- [x] **Single-Tick Loop Accounting**:
+  - Eliminated duplicate `check_esc_timeout` call in interactive loop. Delays progress exactly once per frame tick.
 
 ---
 

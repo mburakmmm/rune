@@ -35,6 +35,10 @@ class Frame:
     def clear_clip(self: Frame) -> None:
         self.buffer.set_clip(None)
 
+    def with_clip(self: Frame, rect: Rect) -> Frame:
+        self.push_clip(rect)
+        return self
+
     def get_clip(self: Frame) -> Rect | None:
         return self.buffer.get_clip()
 
@@ -116,8 +120,12 @@ class AppRunner:
     def render_frame(self: AppRunner) -> None:
         if self.auto_clear:
             self.driver.current_buffer.clear()
+        self.driver.current_buffer.set_clip(None)
         frame: Frame = Frame(self.driver.current_buffer)
-        self.app.view(frame)
+        try:
+            self.app.view(frame)
+        finally:
+            frame.clear_clip()
         self.driver.flush()
         self.frame_count = self.frame_count + 1
 
@@ -201,7 +209,6 @@ class AppRunner:
             while self.app.running:
                 if max_frames >= 0 and self.frame_count >= max_frames:
                     break
-                self.check_esc_timeout(self.tick_rate_ms)
                 self.process_input_queue()
                 if not self.app.running:
                     break

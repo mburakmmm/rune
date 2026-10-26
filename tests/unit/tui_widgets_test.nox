@@ -254,4 +254,28 @@ if c3 != None:
 buf_stack.pop_clip()
 nox.test.assert_true(buf_stack.get_clip() == None, "popping all clips clears clip_rect")
 
+# 13. External Wide Character Boundary Preservation (GPT 5.6 Scenario)
+# Scenario A: Left-neighbor outside clip
+buf_ext: ScreenBuffer = ScreenBuffer(10, 2)
+buf_ext.set(4, 0, "界")
+nox.test.assert_eq_str(buf_ext.get(4, 0).char, "界", "cell 4 is wide char")
+nox.test.assert_eq_int(buf_ext.get(5, 0).width, 0, "cell 5 is continuation")
+
+# Activate clip rect covering columns 5..9 (cell 4 is strictly outside!)
+buf_ext.set_clip(Rect(5, 0, 5, 1))
+# Write inside clip rect at cell 5
+buf_ext.set(5, 0, "A")
+# Cell 4 (outside clip) must be completely untouched and preserved!
+nox.test.assert_eq_str(buf_ext.get(4, 0).char, "界", "wide char at cell 4 outside clip rect is preserved")
+nox.test.assert_eq_str(buf_ext.get(5, 0).char, "A", "cell 5 inside clip rect receives A")
+
+# Scenario B: Right-neighbor outside clip
+buf_ext_r: ScreenBuffer = ScreenBuffer(10, 2)
+buf_ext_r.set(4, 0, "界")
+# Activate clip rect covering columns 0..4 (cell 5 is strictly outside!)
+buf_ext_r.set_clip(Rect(0, 0, 5, 1))
+buf_ext_r.set(4, 0, "B")
+nox.test.assert_eq_str(buf_ext_r.get(4, 0).char, "B", "cell 4 inside clip rect receives B")
+nox.test.assert_eq_int(buf_ext_r.get(5, 0).width, 0, "cell 5 outside clip rect was not mutated")
+
 print("tui_widgets_test passed")

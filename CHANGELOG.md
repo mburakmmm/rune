@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.4] - 2026-10-26
+
+### Fixed & Hardened (GPT 5.6 Audit Hardening for Boundary Atomization, Scoped Clips, and Single-Tick Accounting)
+- **[P1] External Wide Character Boundary Preservation (`ScreenBuffer.set`)**:
+  - `ScreenBuffer.set()` now strictly verifies that neighbor cells (`x - 1`, `x + 1`, `x + 2`) are inside `clip_rect` before atomizing or clearing them.
+  - Characters residing outside the active clipping rectangle are 100% immutable and guaranteed never to be mutated or cleared by drawing operations occurring within an adjacent clipped container.
+- **[P1] Scoped Clip Stack & Frame Try-Finally Protection**:
+  - `AppRunner.render_frame()` now guarantees `frame.clear_clip()` in a strict `try ... finally` block, ensuring that any unhandled exception during `app.view(frame)` or widget drawing cannot leave orphaned clip rectangles in the buffer.
+  - Added `Frame.with_clip(rect)` fluent helper for scoped child rendering.
+- **[P1] Single-Tick Accounting in Event Loop (`AppRunner.run_interactive`)**:
+  - Removed duplicate `check_esc_timeout` invocation in the interactive loop. Tick events now advance timeout counters exactly once per frame tick, preventing escape sequences from triggering premature timeouts.
+
+---
+
 ## [1.4.3] - 2026-10-26
 
 ### Fixed & Hardened (GPT 5.6 Audit Hardening for Left-Clipping, Unicode Straddles, Clip Stacks, and Escape Delays)

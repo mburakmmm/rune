@@ -238,4 +238,19 @@ delay_runner.check_esc_timeout(30)
 nox.test.assert_eq_int(len(delay_runner.input_queue), 1, "timeout reached, standalone ESC emitted")
 nox.test.assert_eq_str(delay_runner.input_queue[0].key, "esc", "emitted key is esc")
 
+# 10. Single Tick Accounting Test (No Double Counting)
+single_app: CounterApp = CounterApp()
+single_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+single_runner: AppRunner = AppRunner(single_app, single_driver, 50)
+single_app.init()
+single_runner.queue_raw(ESC)
+
+single_runner.step(make_tick_event(30))
+nox.test.assert_eq_int(len(single_runner.input_queue), 0, "single 30ms step does not double count to 60ms")
+nox.test.assert_eq_str(single_runner.decoder.buffer, ESC, "buffer still holds ESC after single step")
+
+single_runner.step(make_tick_event(30))
+nox.test.assert_eq_int(len(single_runner.input_queue), 1, "timeout flushed after second step reaches 60ms")
+nox.test.assert_eq_str(single_runner.input_queue[0].key, "esc", "flushed esc event")
+
 print("tui_app_test passed")
