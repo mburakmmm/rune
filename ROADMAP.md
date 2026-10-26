@@ -24,7 +24,10 @@
 | **Phase 5.9: Cross-Platform** | `v0.9.0` | Windows VT console compatibility & snapshot tests | **Completed** | `snapshot_test` |
 | **Phase 6: Rune 1.0 Release** | `v1.0.0` | Public API freeze, complete documentation, release gates | **Completed** | Full Suite (17 suites) |
 | **Phase 6.1: Security & Unicode** | `v1.0.1` | \r line spoofing fix, C1 stripping, cell_width wcwidth, CI prompts | **Completed** | `security_hardening_test` (18 suites) |
-| **Post-1.0: TUI Evaluation** | `v1.1+` / Sub | Alternate screen buffers, raw keyboard mode, event loop | **Deferred** | Design Review |
+| **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Planned** | `tui_buffer_test` |
+| **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Planned** | `tui_layout_test` |
+| **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Planned** | `tui_widgets_test` |
+| **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Planned** | `tui_app_test` |
 
 ---
 
@@ -264,12 +267,83 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 🔮 Post-1.0: Full-Screen TUI Framework
-**Status:** Deliberate Non-Goal for 1.0 (`AGENTS.md §13`).
+### 🔮 Post-1.0: Full-Screen TUI Framework (`rune.tui`)
+**Status:** Approved for Post-1.0 Development.
+**Architectural Decision:** Implemented as first-class module `rune.tui` (depending strictly on `rune.core` and `rune.render`).
 
-- [ ] Formal architecture review for interactive full-screen applications.
-- [ ] Evaluate alternate screen buffers (`\x1b[?1049h`), raw keyboard input (`termios`), and resize signals (`SIGWINCH`).
-- [ ] Decide between `rune.tui` module vs a dedicated standalone package (e.g. `rune-tui`).
+---
+
+### 🖥️ v1.1.0 — Phase 7: Terminal Screen Driver & Virtual Buffer (Planned)
+**Goal:** Deliver a flicker-free, double-buffered screen rendering engine and alternate screen manager in pure Nox.
+
+- [ ] **Virtual Screen Buffer (`ScreenBuffer` / `CellGrid`)**:
+  - 2D grid of character cells: `Cell(char: str, style: Style, width: int)`.
+  - Double buffering: maintain `current_buffer` and `previous_buffer` to eliminate redraw flicker.
+  - Diff-based painter: compute only mutated cells and emit localized cursor jump sequences (`\x1b[{r};{c}H`), minimizing ANSI bandwidth.
+- [ ] **Alternate Screen Buffer & Cursor Control (`TerminalDriver`)**:
+  - `enter_alt_screen()`: switch to alternate screen buffer (`\x1b[?1049h`).
+  - `leave_alt_screen()`: restore user's original shell buffer (`\x1b[?1049l`).
+  - `hide_cursor()` (`\x1b[?25l`) and `show_cursor()` (`\x1b[?25h`).
+  - `clear_screen()` (`\x1b[2J`) and `clear_line()` (`\x1b[2K`).
+- [ ] **Terminal Restoration Safety**:
+  - Guaranteed restoration cleanup: ensure `leave_alt_screen()` and `show_cursor()` execute reliably on unhandled exceptions or normal exit.
+- [ ] **Unit & Mock Tests**:
+  - In-memory `MockTerminalDriver` capturing escape sequence streams.
+  - Diff-calculation unit tests verifying minimal ANSI emission.
+
+---
+
+### 📐 v1.2.0 — Phase 8: Geometry & Flex Layout Engine (Planned)
+**Goal:** Provide a flexible bounding-box and constraint-based layout engine inspired by Ratatui / CSS Flexbox.
+
+- [ ] **Rectangular Geometry (`Rect`)**:
+  - `Rect(x: int, y: int, width: int, height: int)`.
+  - Intersection, containment, padding, and inner margin helpers (`rect.inner(margin)`).
+- [ ] **Layout Constraints (`Constraint`)**:
+  - `Length(n)`: fixed cell dimension.
+  - `Percentage(p)`: percentage of parent container.
+  - `Ratio(num, den)`: exact fractional width/height.
+  - `Min(n)` / `Max(n)`: bounded dynamic dimensions.
+- [ ] **Flex Layout Solver (`Layout`)**:
+  - Direction support: `Direction.Horizontal` and `Direction.Vertical`.
+  - Margin & spacing distribution between split chunks.
+  - Deterministic integer coordinate rounding without pixel/cell gaps.
+  - Comprehensive unit tests covering 2-column, 3-row, and nested grid layouts.
+
+---
+
+### 🧩 v1.3.0 — Phase 9: Declarative TUI Widgets (Planned)
+**Goal:** Introduce a composable widget library for building dashboards, monitors, and navigation panels.
+
+- [ ] **Container Widgets (`Block`)**:
+  - Frame container with borders (`rounded`, `square`, `double`, `ascii`).
+  - Configurable title, title alignment (`left`, `center`, `right`), and background styling.
+- [ ] **Text & Content Widgets**:
+  - `Paragraph`: multiline styled text with word wrapping, alignment, and vertical scroll offset (`scroll: int`).
+  - `Gauge`: visual percentage bar with fill characters and labels.
+  - `Tabs`: top navigation bar with active tab highlight and keyboard accelerators.
+- [ ] **Data & Selection Widgets**:
+  - `ListWidget`: vertical item list with selectable active row highlight (`selected_index: int`).
+  - `TableWidget`: fixed column headers, scrollable rows, and selected row indicator.
+  - `HelpBar`: bottom footer displaying active keybindings (e.g. `[q] Quit  [Tab] Switch  [↑/↓] Navigate`).
+
+---
+
+### 🎮 v1.4.0 — Phase 10: Event Loop & Interactive App Runner (Planned)
+**Goal:** Deliver an event-driven application runtime (Elm Architecture / Bubbletea style) for full-screen Nox applications.
+
+- [ ] **ANSI Key & Escape Sequence Parser**:
+  - Parse VT escape sequences: Arrow keys (Up, Down, Left, Right), Home, End, PageUp, PageDown, Delete, Backspace, Enter, Tab, Esc.
+  - Detect Ctrl combinations (`Ctrl+C`, `Ctrl+D`).
+- [ ] **Event Model (`Event`)**:
+  - `KeyEvent(key: str, ctrl: bool, alt: bool)`.
+  - `TickEvent(delta_ms: int)` for periodic animations and telemetry refresh.
+  - `ResizeEvent(width: int, height: int)` for terminal size adjustments.
+- [ ] **TUI Application Runtime (`TuiApp` & `Frame`)**:
+  - Lifecycle methods: `init()`, `update(event) -> bool`, `view(frame: Frame)`.
+  - Redraw scheduling: render only when state changes or timer ticks.
+- [ ] **Complete TUI Showcase App**:
+  - Interactive system monitor / process dashboard example in `examples/tui_dashboard.nox`.
 
 ---
 

@@ -20,16 +20,20 @@ Rune Architecture
 ├── rune.prompt      # Line input, boolean confirmation, choice selection
 │   └── depends on rune.core
 │
-└── rune.cli         # Arguments, Options, Commands, Subcommands, Help generation, App runner
-    └── depends on rune.core + optional rune.render / rune.prompt
+├── rune.cli         # Arguments, Options, Commands, Subcommands, Help generation, App runner
+│   └── depends on rune.core + optional rune.render / rune.prompt
+│
+└── rune.tui         # Full-screen terminal UI: virtual screen buffer, flex layout, declarative widgets
+    └── depends on rune.core + rune.render
 ```
 
 ### Dependency Invariants
-- `rune.core` NEVER imports `render`, `progress`, `prompt`, or `cli`.
-- `rune.render` NEVER imports `cli` or `prompt`.
-- `rune.progress` NEVER imports `cli`.
-- `rune.prompt` NEVER imports `cli`.
+- `rune.core` NEVER imports `render`, `progress`, `prompt`, `cli`, or `tui`.
+- `rune.render` NEVER imports `cli`, `prompt`, or `tui`.
+- `rune.progress` NEVER imports `cli` or `tui`.
+- `rune.prompt` NEVER imports `cli` or `tui`.
 - `rune.cli` may consume `render` and `prompt`, but MUST function gracefully in pure plain-text mode.
+- `rune.tui` consumes `core` and `render`; never imported by lower modules.
 - No cyclic dependencies permitted anywhere.
 
 ---
