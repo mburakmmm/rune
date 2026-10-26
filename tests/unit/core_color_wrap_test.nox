@@ -40,4 +40,11 @@ long_word_wrap: list[str] = wrap_text("1234567890abcdef", 5)
 nox.test.assert_eq_int(len(long_word_wrap), 4, "16 chars wrapped by 5 must produce 4 lines")
 nox.test.assert_eq_str(long_word_wrap[0], "12345", "First chunk matches")
 
+# Long CJK word breaking by display cell width (width 2 each)
+cjk_long_wrap: list[str] = wrap_text("世界世界世界", 4)
+nox.test.assert_eq_int(len(cjk_long_wrap), 3, "6 CJK chars (12 cells) wrapped by 4 cells must produce 3 lines")
+nox.test.assert_eq_str(cjk_long_wrap[0], "世界", "First CJK chunk is 2 characters")
+nox.test.assert_eq_str(cjk_long_wrap[1], "世界", "Second CJK chunk is 2 characters")
+nox.test.assert_eq_str(cjk_long_wrap[2], "世界", "Third CJK chunk is 2 characters")
+
 print("core_color_wrap_test passed")

@@ -148,4 +148,60 @@ nox.test.assert_true(not nox.strings.contains(diff3, "Status:"), "does not re-em
 diff4: str = mock_diff.flush()
 nox.test.assert_eq_str(diff4, "", "fourth flush with no changes is empty")
 
+# 6. P0 Wide Character Cell Integrity & Overwrite Tests (GPT 5.6 Audit Fixes)
+buf_audit: ScreenBuffer = ScreenBuffer(10, 5)
+
+# Scenario A: Wide -> ASCII overwrite (left half overwritten)
+buf_audit.write_string(0, 0, "界")
+nox.test.assert_eq_str(buf_audit.get(0, 0).char, "界", "initially wide char")
+nox.test.assert_eq_int(buf_audit.get(0, 0).width, 2, "width is 2")
+nox.test.assert_eq_int(buf_audit.get(1, 0).width, 0, "continuation width is 0")
+
+buf_audit.set(0, 0, "A")
+nox.test.assert_eq_str(buf_audit.get(0, 0).char, "A", "cell 0 overwritten with A")
+nox.test.assert_eq_int(buf_audit.get(0, 0).width, 1, "cell 0 width is now 1")
+nox.test.assert_eq_str(buf_audit.get(1, 0).char, " ", "orphaned continuation cell 1 cleared to space")
+nox.test.assert_eq_int(buf_audit.get(1, 0).width, 1, "cleared cell 1 width is now 1")
+
+# Scenario B: Continuation cell overwrite (right half overwritten)
+buf_audit.write_string(0, 1, "界")
+nox.test.assert_eq_str(buf_audit.get(0, 1).char, "界", "row 1 initially wide char")
+buf_audit.set(1, 1, "B")
+nox.test.assert_eq_str(buf_audit.get(1, 1).char, "B", "continuation cell overwritten with B")
+nox.test.assert_eq_int(buf_audit.get(1, 1).width, 1, "cell 1 width is 1")
+nox.test.assert_eq_str(buf_audit.get(0, 1).char, " ", "orphaned leading wide cell 0 cleared to space")
+nox.test.assert_eq_int(buf_audit.get(0, 1).width, 1, "cleared cell 0 width is 1")
+
+# Scenario C: Wide over Wide with offset by 1
+buf_audit.write_string(0, 2, "世界") # cells 0, 1, 2, 3
+buf_audit.set(1, 2, "中") # writes wide char at 1, covering cells 1 and 2
+nox.test.assert_eq_str(buf_audit.get(0, 2).char, " ", "cell 0 cleared because its right half was overwritten")
+nox.test.assert_eq_str(buf_audit.get(1, 2).char, "中", "cell 1 contains 中")
+nox.test.assert_eq_int(buf_audit.get(1, 2).width, 2, "cell 1 width is 2")
+nox.test.assert_eq_int(buf_audit.get(2, 2).width, 0, "cell 2 is continuation for 中")
+nox.test.assert_eq_str(buf_audit.get(3, 2).char, " ", "cell 3 cleared because its left half was overwritten")
+
+# Scenario D: Right edge wide char resize clipping
+buf_edge: ScreenBuffer = ScreenBuffer(10, 2)
+buf_edge.set(8, 0, "界") # spans columns 8 and 9
+nox.test.assert_eq_str(buf_edge.get(8, 0).char, "界", "cell 8 has wide char")
+# Resize down to 9 columns (clips column 9)
+buf_edge.resize(9, 2)
+nox.test.assert_eq_int(buf_edge.width, 9, "new width is 9")
+nox.test.assert_eq_str(buf_edge.get(8, 0).char, " ", "clipped wide char at right edge safely cleared to space")
+nox.test.assert_eq_int(buf_edge.get(8, 0).width, 1, "cell 8 width reset to 1")
+
+# Scenario E: TerminalDriver resize forces full redraw
+mock_resize: MockTerminalDriver = MockTerminalDriver(10, 5, True, True)
+mock_resize.draw_string(0, 0, "Hello")
+mock_resize.flush()
+# Second flush is empty
+nox.test.assert_eq_str(mock_resize.flush(), "", "flush with no changes is empty")
+# Resize driver
+mock_resize.resize(20, 5)
+# Next flush must NOT be empty because previous_buffer was cleared on resize
+diff_after_resize: str = mock_resize.flush()
+nox.test.assert_true(len(diff_after_resize) > 0, "flush after resize forces full redraw")
+nox.test.assert_true(nox.strings.contains(diff_after_resize, "Hello"), "contains buffer text after resize redraw")
+
 print("tui_buffer_test passed")

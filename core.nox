@@ -442,18 +442,21 @@ def wrap_text(s: str, max_width: int) -> list[str]:
                 else:
                     lines.append(cur_line)
                     if w_len > max_width:
-                        chunk_start2: int = 0
-                        cur_line = ""
-                        while chunk_start2 < len(word):
-                            chunk_end2: int = chunk_start2 + max_width
-                            if chunk_end2 > len(word):
-                                chunk_end2 = len(word)
-                            chunk2: str = word[chunk_start2:chunk_end2]
-                            if len(chunk2) == max_width:
-                                lines.append(chunk2)
+                        chunk_str2: str = ""
+                        chunk_w2: int = 0
+                        ch_idx2: int = 0
+                        while ch_idx2 < len(word):
+                            c2: str = word[ch_idx2]
+                            cw2: int = char_width(c2)
+                            if chunk_w2 + cw2 > max_width and len(chunk_str2) > 0:
+                                lines.append(chunk_str2)
+                                chunk_str2 = c2
+                                chunk_w2 = cw2
                             else:
-                                cur_line = chunk2
-                            chunk_start2 = chunk_start2 + max_width
+                                chunk_str2 = chunk_str2 + c2
+                                chunk_w2 = chunk_w2 + cw2
+                            ch_idx2 = ch_idx2 + 1
+                        cur_line = chunk_str2
                     else:
                         cur_line = word
             w_idx = w_idx + 1

@@ -69,17 +69,46 @@ class ScreenBuffer:
         return self.cells[idx]
 
     def set(self: ScreenBuffer, x: int, y: int, char: str, style: Style | None = None) -> None:
-
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
         idx: int = y * self.width + x
         w: int = char_width(char)
         if w <= 0:
             w = 1
-        self.cells[idx] = Cell(char, style, w)
+
+        # Case 1: If target cell is continuation of a previous wide char (width == 0),
+        # writing over it breaks the left half at (x - 1)! Clean the left half to space:
+        if self.cells[idx].width == 0 and x > 0:
+            prev_idx: int = y * self.width + (x - 1)
+            if self.cells[prev_idx].width == 2:
+                self.cells[prev_idx] = Cell(" ", None, 1)
+
+        # Case 2: If target cell is a wide char (width == 2),
+        # writing over it breaks the continuation cell at (x + 1)! Clean continuation to space:
+        if self.cells[idx].width == 2 and x + 1 < self.width:
+            next_idx: int = y * self.width + (x + 1)
+            if self.cells[next_idx].width == 0:
+                self.cells[next_idx] = Cell(" ", None, 1)
+
+        # Case 3: If the new character to be written is wide (width == 2):
+        if w == 2:
+            # Cannot fit wide char on the very last column
+            if x + 1 >= self.width:
+                self.cells[idx] = Cell(" ", None, 1)
+                return
+
+            # Check if cell at (x + 1) is itself a wide char or continuation
+            next_idx2: int = y * self.width + (x + 1)
+            if self.cells[next_idx2].width == 2 and x + 2 < self.width:
+                # Clear its continuation cell at (x + 2)
+                self.cells[y * self.width + (x + 2)] = Cell(" ", None, 1)
+
+            self.cells[idx] = Cell(char, style, 2)
+            self.cells[next_idx2] = Cell("", style, 0)
+        else:
+            self.cells[idx] = Cell(char, style, 1)
 
     def write_string(self: ScreenBuffer, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
-
         if y < 0 or y >= self.height:
             return x
         st: Style = Style()
@@ -104,8 +133,6 @@ class ScreenBuffer:
             if max_width >= 0 and written_cells + w > max_width:
                 break
             self.set(cur_x, y, ch, st)
-            if w > 1 and cur_x + 1 < self.width:
-                self.cells[y * self.width + (cur_x + 1)] = Cell("", st, 0)
             cur_x = cur_x + w
             written_cells = written_cells + w
             i = i + 1
@@ -145,7 +172,6 @@ class ScreenBuffer:
         return b
 
     def resize(self: ScreenBuffer, new_w: int, new_h: int) -> None:
-
         if new_w < 1:
             new_w = 1
         if new_h < 1:
@@ -166,6 +192,10 @@ class ScreenBuffer:
                 new_idx: int = row * new_w + col
                 new_cells[new_idx] = self.cells[old_idx]
                 col = col + 1
+            # If the rightmost column in new buffer has a wide char, its continuation was clipped!
+            last_col_idx: int = row * new_w + (new_w - 1)
+            if new_cells[last_col_idx].width == 2:
+                new_cells[last_col_idx] = Cell(" ", None, 1)
             row = row + 1
         self.width = new_w
         self.height = new_h
@@ -201,13 +231,16 @@ class TerminalDriver:
         self.previous_buffer = ScreenBuffer(width, height)
 
     def write_raw(self: TerminalDriver, s: str) -> None:
-
         if len(s) == 0:
             return
         if self.capture_mode:
             self.captured_output = self.captured_output + s
         else:
-            print(s)
+            # Park cursor at row 1, col 1 so print()'s trailing newline never scrolls the bottom line offscreen
+            if self.options.supports_ansi:
+                print(s + esc_code() + "[H")
+            else:
+                print(s)
 
     def enter_alt_screen(self: TerminalDriver) -> None:
 
@@ -351,9 +384,10 @@ class TerminalDriver:
         self.current_buffer.fill_rect(x, y, w, h, char, style)
 
     def resize(self: TerminalDriver, width: int, height: int) -> None:
-
         self.current_buffer.resize(width, height)
         self.previous_buffer.resize(width, height)
+        # Clear previous buffer so next flush() triggers a full redraw of the new terminal bounds
+        self.previous_buffer.clear()
 
     def get_captured(self: TerminalDriver) -> str:
 
