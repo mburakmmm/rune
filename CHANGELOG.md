@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-10-26
+
+### Added (Phase 7: Terminal Screen Driver & Virtual Buffer)
+- **`rune.tui` Module**:
+  - Introduced the dedicated Full-Screen Terminal User Interface module.
+- **`Cell` Class**:
+  - Models an individual terminal display cell with character glyph, visible cell width (1 or 2), and associated `Style`.
+  - Includes `is_same()`, `clone()`, and `reset()`.
+- **`ScreenBuffer` Class**:
+  - 2D character cell matrix for off-screen rendering.
+  - Bounds-checked `get()`, `set()`, `fill_rect()`, `clear()`, `clone()`, and `resize()`.
+  - `write_string()` supporting automatic wide-character (CJK/Emoji) 2-cell allocation and placeholder positioning.
+- **`TerminalDriver` & `MockTerminalDriver`**:
+  - Alternate screen buffer management: `enter_alt_screen()` (`\x1b[?1049h`), `leave_alt_screen()` (`\x1b[?1049l`).
+  - Cursor control: `hide_cursor()` (`\x1b[?25l`), `show_cursor()` (`\x1b[?25h`), `move_cursor(row, col)` (`\x1b[{r};{c}H`).
+  - Screen operations: `clear_screen()` (`\x1b[2J\x1b[H`), `clear_line()` (`\x1b[2K`).
+  - Double-buffering & Diff-based painter: `render_diff()` and `flush()`. Compares `current_buffer` and `previous_buffer`, emitting minimal ANSI commands and localized cursor jumps to eliminate screen flicker.
+  - Restoration guarantee: `restore()` ensures the cursor is restored and alternate screen exited safely on errors or exit.
+  - `MockTerminalDriver` for headless testing and ANSI escape sequence stream capture.
+- **Test Suite**:
+  - Added `tests/unit/tui_buffer_test.nox` (19 passing test suites total).
+- **Example**:
+  - Added `examples/tui_buffer_demo.nox` demonstrating double-buffered diff rendering.
+
+---
+
 ## [1.0.1] - 2026-10-26
 
 ### Security & Hardening Fixes

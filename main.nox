@@ -6,13 +6,13 @@ from rune import Console, Style, Rule, Panel, Table, Tree, TreeNode, ProgressBar
 def run_showcase(console: Console) -> None:
     # 1. Title Banner
     console.print("")
-    rule_top: Rule = Rule("Rune 1.0.1 Showcase", "─", "center", Style("cyan", "", True))
+    rule_top: Rule = Rule("Rune 1.1.0 Showcase", "─", "center", Style("cyan", "", True))
     console.print(rule_top.render(console.options))
     console.print("")
 
     # 2. Panel
     welcome_panel: Panel = Panel(
-        "Rune combines the capabilities of Python's Rich + Click + Typer\ninto a unified, statically typed, dependency-free toolkit for Nox.",
+        "Rune combines Rich + Click + Typer + Ratatui/Bubbletea TUI\ninto a unified, statically typed, dependency-free toolkit for Nox.",
         "About Rune",
         "Nox Native",
         "rounded",
@@ -48,6 +48,7 @@ def run_showcase(console: Console) -> None:
     src_node.add("progress.nox")
     src_node.add("prompt.nox")
     src_node.add("cli.nox")
+    src_node.add("tui.nox")
     tr.add("nox.json")
     tr.add("README.md")
 
@@ -80,7 +81,7 @@ cmd.add_option("completion", "", TYPE_STR, False, False, "", "Generate shell com
 showcase_sub: Command = Command("demo", "Run interactive visual showcase")
 cmd.add_subcommand(showcase_sub)
 
-app: CliApp = CliApp(cmd, "1.0.1")
+app: CliApp = CliApp(cmd, "1.1.0")
 res: CliResult = app.parse([])
 
 # If run directly without args, show showcase

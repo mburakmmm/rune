@@ -1,0 +1,151 @@
+# tests/unit/tui_buffer_test.nox — Unit tests for TerminalDriver, ScreenBuffer, Cell, and Diff Rendering.
+
+import nox.test
+import nox.strings
+import core
+from core import Style, ConsoleOptions
+import tui
+from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver
+
+# 1. Cell Basics
+c1: Cell = Cell()
+nox.test.assert_eq_str(c1.char, " ", "default cell char should be space")
+nox.test.assert_eq_int(c1.width, 1, "default cell width should be 1")
+nox.test.assert_true(c1.style.is_plain(), "default cell style should be plain")
+
+c2: Cell = Cell("X", Style("green", "black", True), 1)
+nox.test.assert_eq_str(c2.char, "X", "cell char should be X")
+nox.test.assert_eq_str(c2.style.fg, "green", "fg should be green")
+nox.test.assert_true(c2.style.bold, "bold should be true")
+
+c3: Cell = c2.clone()
+nox.test.assert_true(c2.is_same(c3), "cloned cell should be same")
+
+c3.reset()
+nox.test.assert_eq_str(c3.char, " ", "reset cell char should be space")
+nox.test.assert_true(not c2.is_same(c3), "reset cell should differ from original")
+
+# 2. ScreenBuffer Operations
+buf: ScreenBuffer = ScreenBuffer(10, 5)
+nox.test.assert_eq_int(buf.width, 10, "buf width should be 10")
+nox.test.assert_eq_int(buf.height, 5, "buf height should be 5")
+
+cell_init: Cell = buf.get(0, 0)
+nox.test.assert_eq_str(cell_init.char, " ", "initial cell should be space")
+
+st: Style = Style("cyan")
+buf.set(2, 3, "A", st)
+cell_a: Cell = buf.get(2, 3)
+nox.test.assert_eq_str(cell_a.char, "A", "cell at 2,3 should be A")
+nox.test.assert_eq_str(cell_a.style.fg, "cyan", "style fg should be cyan")
+
+# Out of bounds safe
+cell_oob: Cell = buf.get(99, 99)
+nox.test.assert_eq_str(cell_oob.char, " ", "oob cell should be space")
+buf.set(-5, -5, "Z", st)
+
+# write_string basic
+end_x: int = buf.write_string(0, 0, "Hello", Style("yellow"))
+nox.test.assert_eq_int(end_x, 5, "end_x should be 5")
+nox.test.assert_eq_str(buf.get(0, 0).char, "H", "char at 0,0 should be H")
+nox.test.assert_eq_str(buf.get(4, 0).char, "o", "char at 4,0 should be o")
+nox.test.assert_eq_str(buf.get(5, 0).char, " ", "char at 5,0 should be space")
+
+# write_string with max_width
+end_x2: int = buf.write_string(0, 1, "TestingMax", Style(), 4)
+nox.test.assert_eq_int(end_x2, 4, "end_x2 clamped to max_width")
+nox.test.assert_eq_str(buf.get(3, 1).char, "t", "char at 3,1 should be t")
+nox.test.assert_eq_str(buf.get(4, 1).char, " ", "char at 4,1 should be space")
+
+# fill_rect
+buf.fill_rect(5, 2, 3, 2, "#", Style("red"))
+nox.test.assert_eq_str(buf.get(5, 2).char, "#", "fill_rect cell at 5,2")
+nox.test.assert_eq_str(buf.get(7, 3).char, "#", "fill_rect cell at 7,3")
+nox.test.assert_eq_str(buf.get(8, 3).char, " ", "unfilled cell at 8,3")
+
+# clear
+buf.clear()
+nox.test.assert_eq_str(buf.get(0, 0).char, " ", "cleared cell at 0,0")
+nox.test.assert_eq_str(buf.get(5, 2).char, " ", "cleared cell at 5,2")
+
+# 3. Wide chars and resize
+buf_wide: ScreenBuffer = ScreenBuffer(10, 4)
+end_wide: int = buf_wide.write_string(0, 0, "世界", Style())
+nox.test.assert_eq_int(end_wide, 4, "wide string takes 4 cells")
+nox.test.assert_eq_str(buf_wide.get(0, 0).char, "世", "first wide char")
+nox.test.assert_eq_int(buf_wide.get(0, 0).width, 2, "first wide char width is 2")
+nox.test.assert_eq_int(buf_wide.get(1, 0).width, 0, "continuation cell width is 0")
+nox.test.assert_eq_str(buf_wide.get(2, 0).char, "界", "second wide char")
+
+buf_wide.resize(20, 8)
+nox.test.assert_eq_int(buf_wide.width, 20, "resized width 20")
+nox.test.assert_eq_int(buf_wide.height, 8, "resized height 8")
+nox.test.assert_eq_str(buf_wide.get(0, 0).char, "世", "preserved char after resize")
+nox.test.assert_eq_str(buf_wide.get(15, 6).char, " ", "new empty cell after resize")
+
+# 4. TerminalDriver escape sequences
+mock: MockTerminalDriver = MockTerminalDriver(80, 24, True, True)
+
+# Alternate screen buffer
+mock.enter_alt_screen()
+captured: str = mock.get_captured()
+nox.test.assert_true(nox.strings.contains(captured, "[?1049h"), "enter alt screen sequence emitted")
+nox.test.assert_true(mock.is_alt_screen, "is_alt_screen flag set")
+
+mock.clear_captured()
+mock.leave_alt_screen()
+nox.test.assert_true(nox.strings.contains(mock.get_captured(), "[?1049l"), "leave alt screen sequence emitted")
+nox.test.assert_true(not mock.is_alt_screen, "is_alt_screen flag cleared")
+
+# Cursor visibility
+mock.clear_captured()
+mock.hide_cursor()
+nox.test.assert_true(nox.strings.contains(mock.get_captured(), "[?25l"), "hide cursor sequence emitted")
+nox.test.assert_true(mock.is_cursor_hidden, "is_cursor_hidden flag set")
+
+mock.clear_captured()
+mock.show_cursor()
+nox.test.assert_true(nox.strings.contains(mock.get_captured(), "[?25h"), "show cursor sequence emitted")
+nox.test.assert_true(not mock.is_cursor_hidden, "is_cursor_hidden flag cleared")
+
+# Clear and move
+mock.clear_captured()
+mock.move_cursor(5, 12)
+nox.test.assert_true(nox.strings.contains(mock.get_captured(), "[5;12H"), "move cursor sequence emitted")
+
+mock.clear_captured()
+mock.clear_line()
+nox.test.assert_true(nox.strings.contains(mock.get_captured(), "[2K"), "clear line sequence emitted")
+
+# Automatic restore safety
+mock.hide_cursor()
+mock.enter_alt_screen()
+mock.clear_captured()
+mock.restore()
+restore_out: str = mock.get_captured()
+nox.test.assert_true(nox.strings.contains(restore_out, "[?25h"), "restore re-shows cursor")
+nox.test.assert_true(nox.strings.contains(restore_out, "[?1049l"), "restore leaves alt screen")
+
+# 5. Diff-based rendering & Double-buffering
+mock_diff: MockTerminalDriver = MockTerminalDriver(20, 5, True, True)
+
+mock_diff.draw_string(0, 0, "Status: OK", Style("green"))
+diff1: str = mock_diff.flush()
+nox.test.assert_true(len(diff1) > 0, "first flush emits diff")
+nox.test.assert_true(nox.strings.contains(diff1, "Status: OK"), "contains drawn text")
+
+# No changes: second flush is empty (zero redundant redraws!)
+diff2: str = mock_diff.flush()
+nox.test.assert_eq_str(diff2, "", "second flush with no changes produces empty diff")
+
+# Mutate single cell
+mock_diff.draw_string(8, 0, "ERR", Style("red", "", True))
+diff3: str = mock_diff.flush()
+nox.test.assert_true(nox.strings.contains(diff3, "[1;9H"), "jumps directly to changed position")
+nox.test.assert_true(nox.strings.contains(diff3, "ERR"), "emits updated characters")
+nox.test.assert_true(not nox.strings.contains(diff3, "Status:"), "does not re-emit unchanged cells")
+
+diff4: str = mock_diff.flush()
+nox.test.assert_eq_str(diff4, "", "fourth flush with no changes is empty")
+
+print("tui_buffer_test passed")

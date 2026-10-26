@@ -1,0 +1,373 @@
+# tui.nox — Terminal User Interface driver, virtual screen buffer, and diff-based painter.
+
+import nox.strings
+from core import Style, ConsoleOptions, detect_console_options, esc_code, reset_code, char_width, strip_ansi
+
+class Cell:
+    char: str
+    style: Style
+    width: int
+
+    def __init__(self: Cell, char: str = " ", style: Style | None = None, width: int = 1) -> None:
+        self.char = char
+        if style == None:
+            self.style = Style()
+        else:
+            self.style = style
+        self.width = width
+
+    def reset(self: Cell) -> None:
+
+        self.char = " "
+        self.style = Style()
+        self.width = 1
+
+    def is_same(self: Cell, other: Cell) -> bool:
+
+        if self.char != other.char:
+            return False
+        if self.width != other.width:
+            return False
+        if self.style.fg != other.style.fg or self.style.bg != other.style.bg:
+            return False
+        if self.style.bold != other.style.bold or self.style.dim != other.style.dim:
+            return False
+        if self.style.italic != other.style.italic or self.style.underline != other.style.underline or self.style.reverse != other.style.reverse:
+            return False
+        return True
+
+    def clone(self: Cell) -> Cell:
+
+        return Cell(self.char, self.style, self.width)
+
+class ScreenBuffer:
+    width: int
+    height: int
+    cells: list[Cell]
+
+    def __init__(self: ScreenBuffer, width: int, height: int) -> None:
+        if width < 1:
+            width = 1
+        if height < 1:
+            height = 1
+        self.width = width
+        self.height = height
+        self.cells = []
+        total: int = width * height
+        i: int = 0
+        while i < total:
+            self.cells.append(Cell(" ", None, 1))
+            i = i + 1
+
+    def get(self: ScreenBuffer, x: int, y: int) -> Cell:
+
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            return Cell(" ", None, 1)
+        idx: int = y * self.width + x
+        return self.cells[idx]
+
+    def set(self: ScreenBuffer, x: int, y: int, char: str, style: Style | None = None) -> None:
+
+        if x < 0 or x >= self.width or y < 0 or y >= self.height:
+            return
+        idx: int = y * self.width + x
+        w: int = char_width(char)
+        if w <= 0:
+            w = 1
+        self.cells[idx] = Cell(char, style, w)
+
+    def write_string(self: ScreenBuffer, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
+
+        if y < 0 or y >= self.height:
+            return x
+        st: Style = Style()
+        if style != None:
+            st = style
+        cur_x: int = x
+        written_cells: int = 0
+        i: int = 0
+        n: int = len(text)
+        while i < n:
+            if cur_x >= self.width:
+                break
+            if max_width >= 0 and written_cells >= max_width:
+                break
+            ch: str = text[i]
+            w: int = char_width(ch)
+            if w <= 0:
+                i = i + 1
+                continue
+            if cur_x + w > self.width:
+                break
+            if max_width >= 0 and written_cells + w > max_width:
+                break
+            self.set(cur_x, y, ch, st)
+            if w > 1 and cur_x + 1 < self.width:
+                self.cells[y * self.width + (cur_x + 1)] = Cell("", st, 0)
+            cur_x = cur_x + w
+            written_cells = written_cells + w
+            i = i + 1
+        return cur_x
+
+    def fill_rect(self: ScreenBuffer, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
+
+        st: Style = Style()
+        if style != None:
+            st = style
+        row: int = y
+        while row < y + h:
+            if row >= 0 and row < self.height:
+                col: int = x
+                while col < x + w:
+                    if col >= 0 and col < self.width:
+                        self.set(col, row, char, st)
+                    col = col + 1
+            row = row + 1
+
+    def clear(self: ScreenBuffer) -> None:
+
+        i: int = 0
+        n: int = len(self.cells)
+        while i < n:
+            self.cells[i] = Cell(" ", None, 1)
+            i = i + 1
+
+    def clone(self: ScreenBuffer) -> ScreenBuffer:
+
+        b: ScreenBuffer = ScreenBuffer(self.width, self.height)
+        i: int = 0
+        n: int = len(self.cells)
+        while i < n:
+            b.cells[i] = self.cells[i].clone()
+            i = i + 1
+        return b
+
+    def resize(self: ScreenBuffer, new_w: int, new_h: int) -> None:
+
+        if new_w < 1:
+            new_w = 1
+        if new_h < 1:
+            new_h = 1
+        if new_w == self.width and new_h == self.height:
+            return
+        new_cells: list[Cell] = []
+        total: int = new_w * new_h
+        i: int = 0
+        while i < total:
+            new_cells.append(Cell(" ", None, 1))
+            i = i + 1
+        row: int = 0
+        while row < new_h and row < self.height:
+            col: int = 0
+            while col < new_w and col < self.width:
+                old_idx: int = row * self.width + col
+                new_idx: int = row * new_w + col
+                new_cells[new_idx] = self.cells[old_idx]
+                col = col + 1
+            row = row + 1
+        self.width = new_w
+        self.height = new_h
+        self.cells = new_cells
+
+class TerminalDriver:
+    options: ConsoleOptions
+    is_alt_screen: bool
+    is_cursor_hidden: bool
+    capture_mode: bool
+    captured_output: str
+    current_buffer: ScreenBuffer
+    previous_buffer: ScreenBuffer
+
+    def __init__(self: TerminalDriver, options: ConsoleOptions | None = None, capture_mode: bool = False, width: int = 80, height: int = 24) -> None:
+        if options == None:
+            self.options = detect_console_options()
+        else:
+            self.options = options
+        self.capture_mode = capture_mode
+        self.captured_output = ""
+        self.is_alt_screen = False
+        self.is_cursor_hidden = False
+        if width <= 0:
+            width = self.options.width
+        if height <= 0:
+            height = self.options.height
+        if width <= 0:
+            width = 80
+        if height <= 0:
+            height = 24
+        self.current_buffer = ScreenBuffer(width, height)
+        self.previous_buffer = ScreenBuffer(width, height)
+
+    def write_raw(self: TerminalDriver, s: str) -> None:
+
+        if len(s) == 0:
+            return
+        if self.capture_mode:
+            self.captured_output = self.captured_output + s
+        else:
+            print(s)
+
+    def enter_alt_screen(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi and not self.is_alt_screen:
+            # \x1b[?1049h: switch to alternate screen buffer
+            seq: str = esc_code() + "[?1049h"
+            self.write_raw(seq)
+            self.is_alt_screen = True
+            self.clear_screen()
+
+    def leave_alt_screen(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi and self.is_alt_screen:
+            # \x1b[?1049l: restore previous screen buffer
+            seq: str = esc_code() + "[?1049l"
+            self.write_raw(seq)
+            self.is_alt_screen = False
+
+    def hide_cursor(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi and not self.is_cursor_hidden:
+            seq: str = esc_code() + "[?25l"
+            self.write_raw(seq)
+            self.is_cursor_hidden = True
+
+    def show_cursor(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi and self.is_cursor_hidden:
+            seq: str = esc_code() + "[?25h"
+            self.write_raw(seq)
+            self.is_cursor_hidden = False
+
+    def clear_screen(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi:
+            seq: str = esc_code() + "[2J" + esc_code() + "[H"
+            self.write_raw(seq)
+        self.current_buffer.clear()
+        self.previous_buffer.clear()
+
+    def clear_line(self: TerminalDriver) -> None:
+
+        if self.options.supports_ansi:
+            seq: str = esc_code() + "[2K"
+            self.write_raw(seq)
+
+    def move_cursor(self: TerminalDriver, row: int, col: int) -> None:
+
+        if self.options.supports_ansi:
+            if row < 1:
+                row = 1
+            if col < 1:
+                col = 1
+            seq: str = esc_code() + "[" + str(row) + ";" + str(col) + "H"
+            self.write_raw(seq)
+
+    def restore(self: TerminalDriver) -> None:
+
+        if self.is_cursor_hidden:
+            self.show_cursor()
+        if self.is_alt_screen:
+            self.leave_alt_screen()
+
+    def render_diff(self: TerminalDriver, cur: ScreenBuffer, prev: ScreenBuffer) -> str:
+
+        res: str = ""
+        active_fg: str = ""
+        active_bg: str = ""
+        active_bold: bool = False
+        active_dim: bool = False
+        active_italic: bool = False
+        active_underline: bool = False
+        active_reverse: bool = False
+        style_active: bool = False
+
+        y: int = 0
+        while y < cur.height:
+            x: int = 0
+            last_written_x: int = -2
+            while x < cur.width:
+                c_cur: Cell = cur.get(x, y)
+                c_prev: Cell = prev.get(x, y)
+                if not c_cur.is_same(c_prev):
+                    # Position cursor if not consecutive
+                    if x != last_written_x + 1:
+                        if self.options.supports_ansi:
+                            res = res + esc_code() + "[" + str(y + 1) + ";" + str(x + 1) + "H"
+
+                    # Apply styling if changed
+                    if self.options.supports_color:
+                        st: Style = c_cur.style
+                        st_changed: bool = False
+                        if st.fg != active_fg or st.bg != active_bg or st.bold != active_bold:
+                            st_changed = True
+                        if st.dim != active_dim or st.italic != active_italic or st.underline != active_underline or st.reverse != active_reverse:
+                            st_changed = True
+                        if st_changed:
+                            if style_active:
+                                res = res + reset_code()
+                                style_active = False
+                            ansi_code: str = st.to_ansi()
+                            if len(ansi_code) > 0:
+                                res = res + ansi_code
+                                style_active = True
+                            active_fg = st.fg
+                            active_bg = st.bg
+                            active_bold = st.bold
+                            active_dim = st.dim
+                            active_italic = st.italic
+                            active_underline = st.underline
+                            active_reverse = st.reverse
+
+                    # Output character
+                    if c_cur.width > 0:
+                        res = res + c_cur.char
+                        last_written_x = x + c_cur.width - 1
+                    else:
+                        last_written_x = x
+                x = x + 1
+            y = y + 1
+
+        if style_active and self.options.supports_color:
+            res = res + reset_code()
+
+        return res
+
+    def flush(self: TerminalDriver) -> str:
+
+        diff: str = self.render_diff(self.current_buffer, self.previous_buffer)
+        if len(diff) > 0:
+            self.write_raw(diff)
+        self.previous_buffer = self.current_buffer.clone()
+        return diff
+
+    def draw_string(self: TerminalDriver, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
+
+        return self.current_buffer.write_string(x, y, text, style, max_width)
+
+    def fill_rect(self: TerminalDriver, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
+
+        self.current_buffer.fill_rect(x, y, w, h, char, style)
+
+    def resize(self: TerminalDriver, width: int, height: int) -> None:
+
+        self.current_buffer.resize(width, height)
+        self.previous_buffer.resize(width, height)
+
+    def get_captured(self: TerminalDriver) -> str:
+
+        return self.captured_output
+
+    def clear_captured(self: TerminalDriver) -> None:
+
+        self.captured_output = ""
+
+class MockTerminalDriver(TerminalDriver):
+    def __init__(self: MockTerminalDriver, width: int = 80, height: int = 24, supports_ansi: bool = True, supports_color: bool = True) -> None:
+        opts: ConsoleOptions = ConsoleOptions(supports_color, True, width, height, False, False, supports_ansi)
+        self.options = opts
+        self.capture_mode = True
+        self.captured_output = ""
+        self.is_alt_screen = False
+        self.is_cursor_hidden = False
+        self.current_buffer = ScreenBuffer(width, height)
+        self.previous_buffer = ScreenBuffer(width, height)

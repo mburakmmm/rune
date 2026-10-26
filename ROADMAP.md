@@ -24,7 +24,7 @@
 | **Phase 5.9: Cross-Platform** | `v0.9.0` | Windows VT console compatibility & snapshot tests | **Completed** | `snapshot_test` |
 | **Phase 6: Rune 1.0 Release** | `v1.0.0` | Public API freeze, complete documentation, release gates | **Completed** | Full Suite (17 suites) |
 | **Phase 6.1: Security & Unicode** | `v1.0.1` | \r line spoofing fix, C1 stripping, cell_width wcwidth, CI prompts | **Completed** | `security_hardening_test` (18 suites) |
-| **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Planned** | `tui_buffer_test` |
+| **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Completed** | `tui_buffer_test` (19 suites) |
 | **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Planned** | `tui_layout_test` |
 | **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Planned** | `tui_widgets_test` |
 | **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Planned** | `tui_app_test` |
@@ -273,23 +273,24 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 🖥️ v1.1.0 — Phase 7: Terminal Screen Driver & Virtual Buffer (Planned)
+### 🖥️ v1.1.0 — Phase 7: Terminal Screen Driver & Virtual Buffer (Completed)
 **Goal:** Deliver a flicker-free, double-buffered screen rendering engine and alternate screen manager in pure Nox.
 
-- [ ] **Virtual Screen Buffer (`ScreenBuffer` / `CellGrid`)**:
+- [x] **Virtual Screen Buffer (`ScreenBuffer` / `CellGrid`)**:
   - 2D grid of character cells: `Cell(char: str, style: Style, width: int)`.
   - Double buffering: maintain `current_buffer` and `previous_buffer` to eliminate redraw flicker.
   - Diff-based painter: compute only mutated cells and emit localized cursor jump sequences (`\x1b[{r};{c}H`), minimizing ANSI bandwidth.
-- [ ] **Alternate Screen Buffer & Cursor Control (`TerminalDriver`)**:
+- [x] **Alternate Screen Buffer & Cursor Control (`TerminalDriver`)**:
   - `enter_alt_screen()`: switch to alternate screen buffer (`\x1b[?1049h`).
   - `leave_alt_screen()`: restore user's original shell buffer (`\x1b[?1049l`).
   - `hide_cursor()` (`\x1b[?25l`) and `show_cursor()` (`\x1b[?25h`).
-  - `clear_screen()` (`\x1b[2J`) and `clear_line()` (`\x1b[2K`).
-- [ ] **Terminal Restoration Safety**:
+  - `clear_screen()` (`\x1b[2J\x1b[H`) and `clear_line()` (`\x1b[2K`).
+- [x] **Terminal Restoration Safety**:
   - Guaranteed restoration cleanup: ensure `leave_alt_screen()` and `show_cursor()` execute reliably on unhandled exceptions or normal exit.
-- [ ] **Unit & Mock Tests**:
+- [x] **Unit & Mock Tests**:
   - In-memory `MockTerminalDriver` capturing escape sequence streams.
-  - Diff-calculation unit tests verifying minimal ANSI emission.
+  - Diff-calculation unit tests verifying minimal ANSI emission (`tests/unit/tui_buffer_test.nox`).
+  - Example in `examples/tui_buffer_demo.nox`.
 
 ---
 

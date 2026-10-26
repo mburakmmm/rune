@@ -47,3 +47,6 @@ from cli import Command, CliContext, CliResult, CliApp
 
 import completion
 from completion import generate_completion, generate_bash_completion, generate_zsh_completion, generate_fish_completion
+
+import tui
+from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver

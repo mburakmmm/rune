@@ -1,0 +1,51 @@
+# tui_buffer_demo.nox — TerminalDriver and double-buffered ScreenBuffer demonstration.
+
+import rune
+from rune import Console, Style, TerminalDriver, MockTerminalDriver
+
+con: Console = Console()
+
+con.print("=== Rune 1.1.0 — TUI Screen Driver & Buffer Demonstration ===")
+con.print("")
+
+# Initialize driver with capture mode for safe demonstration
+driver: MockTerminalDriver = MockTerminalDriver(60, 10, True, True)
+
+# 1. Enter alternate screen
+driver.enter_alt_screen()
+driver.hide_cursor()
+
+# 2. Draw initial frame into current_buffer
+st_border: Style = Style("cyan", "", True)
+st_title: Style = Style("yellow", "", True)
+st_text: Style = Style("white")
+
+# Draw top header
+driver.fill_rect(0, 0, 60, 1, "─", st_border)
+driver.draw_string(2, 0, " Rune TUI System Monitor v1.1 ", st_title)
+
+# Draw layout boxes
+driver.draw_string(2, 2, "CPU Usage: [██████████────────] 50%", Style("green"))
+driver.draw_string(2, 3, "Mem Usage: [██████████████────] 70%", Style("yellow"))
+driver.draw_string(2, 4, "Processes: 142 active tasks", st_text)
+
+# Draw footer
+driver.fill_rect(0, 9, 60, 1, "─", st_border)
+driver.draw_string(2, 9, " [q] Quit   [r] Refresh   [Tab] Switch Pane ", Style("bright_black"))
+
+# 3. Flush initial frame
+diff_frame1: str = driver.flush()
+con.print("Frame 1 (Initial Draw) Diff Length: " + str(len(diff_frame1)) + " bytes")
+
+# 4. Modify only CPU usage on next tick
+driver.draw_string(2, 2, "CPU Usage: [████████████████──] 80%", Style("red", "", True))
+diff_frame2: str = driver.flush()
+
+con.print("Frame 2 (Single Row Change) Diff Length: " + str(len(diff_frame2)) + " bytes")
+con.print("Notice: Frame 2 is extremely lightweight because unchanged cells are skipped!")
+con.print("")
+
+# 5. Restore terminal safely
+driver.restore()
+con.print("Terminal restored safely.")
+con.print("")

@@ -472,6 +472,14 @@ def get_env_safe(key: str) -> str | None:
         return None
 
 class ConsoleOptions:
+    supports_color: bool
+    supports_unicode: bool
+    width: int
+    height: int
+    is_tty: bool
+    capture: bool
+    supports_ansi: bool
+
     def __init__(
         self: ConsoleOptions,
         supports_color: bool = True,
@@ -479,7 +487,8 @@ class ConsoleOptions:
         width: int = 80,
         height: int = 24,
         is_tty: bool = True,
-        capture: bool = False
+        capture: bool = False,
+        supports_ansi: bool = True
     ) -> None:
         self.supports_color = supports_color
         self.supports_unicode = supports_unicode
@@ -487,6 +496,7 @@ class ConsoleOptions:
         self.height = height
         self.is_tty = is_tty
         self.capture = capture
+        self.supports_ansi = supports_ansi
 
 def detect_console_options() -> ConsoleOptions:
     # 1. Check NO_COLOR (takes high precedence)
@@ -503,6 +513,7 @@ def detect_console_options() -> ConsoleOptions:
 
     supports_color: bool = True
     supports_unicode: bool = True
+    supports_ansi: bool = True
 
     if os_env is not None:
         if os_env == "Windows_NT":
@@ -519,6 +530,7 @@ def detect_console_options() -> ConsoleOptions:
             if not is_modern_win:
                 supports_unicode = False
                 supports_color = False
+                supports_ansi = False
 
     if no_color is not None:
         if len(no_color) > 0:
@@ -531,6 +543,7 @@ def detect_console_options() -> ConsoleOptions:
             if term is not None:
                 if term == "dumb":
                     supports_color = False
+                    supports_ansi = False
 
     is_tty: bool = True
     if ci is not None:
@@ -556,7 +569,7 @@ def detect_console_options() -> ConsoleOptions:
         except ValueError:
             pass
 
-    return ConsoleOptions(supports_color, supports_unicode, term_width, term_height, is_tty, False)
+    return ConsoleOptions(supports_color, supports_unicode, term_width, term_height, is_tty, False, supports_ansi)
 
 class Console:
     options: ConsoleOptions

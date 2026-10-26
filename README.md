@@ -100,6 +100,39 @@ Output with `--help`:
 ```text
 Usage: dock [OPTIONS] <image>
 
+A lightweight container tool
+
+Arguments:
+  <image>                      Image to run (required)
+
+Options:
+  -p, --port <int>             Port mapping [default: 8080]
+  -d, --detach                 Run in background
+  -h, --help                   Show this help message and exit
+```
+
+### 4. Full-Screen TUI Double-Buffering
+
+```nox
+import rune
+from rune import TerminalDriver, Style
+
+driver: TerminalDriver = TerminalDriver()
+driver.enter_alt_screen()
+driver.hide_cursor()
+
+# Draw to virtual buffer
+driver.draw_string(2, 2, "Welcome to Rune TUI!", Style("green", "", True))
+driver.fill_rect(2, 4, 20, 1, "─", Style("cyan"))
+
+# Flush diff to screen (flicker-free!)
+driver.flush()
+
+# Cleanup on exit
+driver.restore()
+```
+Usage: dock [OPTIONS] <image>
+
   A lightweight container tool
 
 Arguments:
@@ -149,6 +182,10 @@ Options:
 | **CLI** | Subcommands | **Supported** | Arbitrary nesting (`git commit`) |
 | **CLI** | Shell Autocompletion | **Supported** | Native generator for Bash, Zsh, and Fish |
 | **CLI** | Standard Exit Codes | **Supported** | 0 (success/help), 2 (usage error), 1 (failure) |
+| **TUI** | Screen Buffer & Cells | **Supported** | 2D character matrix, wide char awareness |
+| **TUI** | Double-Buffering Diff | **Supported** | Flicker-free minimal ANSI diff painter |
+| **TUI** | Alternate Screen Buffer | **Supported** | `\x1b[?1049h` / `\x1b[?1049l` with cleanup |
+| **TUI** | Cursor Control & Restoration | **Supported** | Hide/show, direct positioning, cleanup |
 
 ---
 
