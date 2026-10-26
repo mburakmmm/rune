@@ -15,8 +15,8 @@
 | **Phase 4: Prompts MVP** | `v0.1.0` | Text prompt, Confirm, Choice selection, CI safety | **Completed** | `prompt_test` |
 | **Integration & Release 0.1** | `v0.1.0` | Facade, showcase, examples, docs, publish to index | **Completed** | `integration_test` (6/6 passing) |
 | **Phase 1.5: Advanced Render** | `v0.2.0` | Multiline table wrapping, 256/RGB colors, `Text`/`Span` | **Completed** | `text_test`, `core_color_wrap_test`, `table_multiline_test` |
-| **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Next Up** | Pending |
-| **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Planned** | Pending |
+| **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Completed** | `cli_advanced_test` |
+| **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Next Up** | Pending |
 | **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Planned** | Pending |
 | **Phase 5: Terminal Markdown & DX** | `v0.6.0` | Basic terminal Markdown parser, syntax highlighter | **Planned** | Pending |
 | **Phase 5.5: Shell Completion** | `v0.7.0` | Bash, Zsh, Fish autocompletion script generation | **Planned** | Pending |
@@ -99,25 +99,26 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.3.0 — Advanced CLI Engine & Developer Ergonomics
+### 📦 v0.3.0 — Advanced CLI Engine & Developer Ergonomics (Completed)
 **Goal:** Expand CLI features to match Python Click/Typer versatility.
 
-- [ ] **Choice / Enum Option Validation**:
+- [x] **Choice / Enum Option Validation**:
   - Support `choices: list[str]` on options and positional arguments.
   - Automatically validate and generate readable errors: `Error: Invalid value for '--mode': choose from 'fast', 'slow'`.
   - List allowed choices in `--help` output.
-- [ ] **Environment Variable Sourced Defaults**:
+- [x] **Environment Variable Sourced Defaults**:
   - Support `Option.env_var: str` (e.g. `--token` defaults to `API_TOKEN` env var).
   - Precedence hierarchy: `CLI argument > Environment variable > Declared default`.
   - Safe exception handling with `get_env_safe` (handling `OsError`).
-- [ ] **Grouped Short Flags**:
+- [x] **Grouped Short Flags**:
   - Support clustered boolean flags: `-xvf` expands to `-x`, `-v`, `-f`.
-- [ ] **Repeated / Multiple Options**:
+- [x] **Repeated / Multiple Options**:
   - Support accumulating repeated options (e.g. `--include dir1 --include dir2` -> `list[str]`).
-- [ ] **Command & Option Aliases**:
-  - Support command aliases (e.g. `co` for `commit`, `i` for `install`).
-- [ ] **Secret Redaction in Diagnostics**:
-  - Automatically mask options flagged with `is_secret = True` in help and error outputs.
+  - Retrieve using `CliContext.get_list(name)`.
+- [x] **Command & Option Aliases**:
+  - Support command aliases (e.g. `ci` for `commit`, `i` for `install`).
+- [x] **Secret Redaction in Diagnostics**:
+  - Automatically mask options flagged with `is_secret = True` in help defaults as `[default: ******]`.
 
 ---
 

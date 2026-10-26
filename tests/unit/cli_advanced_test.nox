@@ -1,0 +1,106 @@
+# tests/unit/cli_advanced_test.nox — Tests for choices, env fallbacks, clustered flags, repeated options, and aliases.
+
+import nox.test
+import nox.os
+import core
+from core import Console, ConsoleOptions
+import arguments
+from arguments import TYPE_STR, TYPE_INT, TYPE_BOOL
+import options
+from options import Option
+import cli
+from cli import Command, CliApp, CliResult
+
+opts_ci: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+test_con: Console = Console(opts_ci)
+
+# 1. Clustered short flags (-xvf)
+cmd_cluster: Command = Command("tar")
+cmd_cluster.add_option("extract", "x", TYPE_BOOL, True)
+cmd_cluster.add_option("verbose", "v", TYPE_BOOL, True)
+cmd_cluster.add_option("file", "f", TYPE_BOOL, True)
+
+app_cluster: CliApp = CliApp(cmd_cluster, "1.0", test_con)
+res_cluster: CliResult = app_cluster.parse(["-xvf"])
+nox.test.assert_true(res_cluster.is_success(), "Clustered flags -xvf must parse successfully")
+nox.test.assert_true(res_cluster.context.get_bool("extract"), "Flag -x must be True")
+nox.test.assert_true(res_cluster.context.get_bool("verbose"), "Flag -v must be True")
+nox.test.assert_true(res_cluster.context.get_bool("file"), "Flag -f must be True")
+
+# 2. Choices validation on options
+cmd_choices: Command = Command("server")
+cmd_choices.add_option("mode", "m", TYPE_STR, False, False, "dev", "Server mode", ["dev", "prod"])
+app_choices: CliApp = CliApp(cmd_choices, "1.0", test_con)
+
+res_ch_valid: CliResult = app_choices.parse(["--mode", "prod"])
+nox.test.assert_true(res_ch_valid.is_success(), "Allowed choice must succeed")
+nox.test.assert_eq_str(res_ch_valid.context.get_str("mode"), "prod", "Choice value captured")
+
+res_ch_invalid: CliResult = app_choices.parse(["--mode", "staging"])
+nox.test.assert_true(not res_ch_invalid.is_success(), "Disallowed choice must fail")
+nox.test.assert_eq_int(res_ch_invalid.exit_code, 2, "Choice failure exit code must be 2")
+nox.test.assert_true("staging" in res_ch_invalid.error_message, "Error message must mention invalid input")
+
+# 3. Choices validation on positional arguments
+cmd_arg_ch: Command = Command("deploy")
+cmd_arg_ch.add_argument("target", TYPE_STR, True, "", "Deployment target", False, ["staging", "production"])
+app_arg_ch: CliApp = CliApp(cmd_arg_ch, "1.0", test_con)
+
+res_arg_val: CliResult = app_arg_ch.parse(["staging"])
+nox.test.assert_true(res_arg_val.is_success(), "Valid positional choice must succeed")
+
+res_arg_inval: CliResult = app_arg_ch.parse(["local"])
+nox.test.assert_true(not res_arg_inval.is_success(), "Invalid positional choice must fail")
+nox.test.assert_eq_int(res_arg_inval.exit_code, 2, "Exit code must be 2")
+
+# 4. Environment variable fallback
+nox.os.set_var("RUNE_TEST_API_KEY", "secret_key_12345")
+cmd_env: Command = Command("auth-tool")
+cmd_env.add_option("key", "k", TYPE_STR, False, True, "", "API Key", None, "RUNE_TEST_API_KEY")
+app_env: CliApp = CliApp(cmd_env, "1.0", test_con)
+
+# CLI arg absent: should read from env var
+res_env: CliResult = app_env.parse([])
+nox.test.assert_true(res_env.is_success(), "Option should populate from env var when absent on CLI")
+nox.test.assert_eq_str(res_env.context.get_str("key"), "secret_key_12345", "Value sourced from env var")
+
+# CLI arg provided: CLI arg must take precedence over env var
+res_env_override: CliResult = app_env.parse(["--key", "override_key"])
+nox.test.assert_true(res_env_override.is_success(), "CLI arg takes precedence")
+nox.test.assert_eq_str(res_env_override.context.get_str("key"), "override_key", "CLI value overrides env var")
+
+# 5. Multiple / Repeated options
+cmd_multi: Command = Command("pack")
+cmd_multi.add_option("include", "i", TYPE_STR, False, False, "", "Include path", None, "", True)
+app_multi: CliApp = CliApp(cmd_multi, "1.0", test_con)
+
+res_multi: CliResult = app_multi.parse(["-i", "src/", "-i", "docs/", "--include", "tests/"])
+nox.test.assert_true(res_multi.is_success(), "Multiple options must parse successfully")
+inc_list: list[str] = res_multi.context.get_list("include")
+nox.test.assert_eq_int(len(inc_list), 3, "All 3 repeated values must be accumulated")
+nox.test.assert_eq_str(inc_list[0], "src/", "First value matched")
+nox.test.assert_eq_str(inc_list[1], "docs/", "Second value matched")
+nox.test.assert_eq_str(inc_list[2], "tests/", "Third value matched")
+
+# 6. Command Aliases
+cmd_root: Command = Command("git")
+cmd_sub: Command = Command("commit", "Record changes")
+cmd_sub.add_alias("ci")
+cmd_sub.add_alias("co")
+cmd_sub.add_option("message", "m", TYPE_STR, False, True)
+cmd_root.add_subcommand(cmd_sub)
+
+app_alias: CliApp = CliApp(cmd_root, "1.0", test_con)
+res_alias: CliResult = app_alias.parse(["ci", "-m", "Alias test"])
+nox.test.assert_true(res_alias.is_success(), "Dispatching via alias 'ci' must succeed")
+nox.test.assert_eq_str(res_alias.command.name, "commit", "Target command resolved to 'commit'")
+nox.test.assert_eq_str(res_alias.context.get_str("message"), "Alias test", "Option parsed via alias invocation")
+
+# 7. Secret Redaction in Help
+cmd_sec: Command = Command("db")
+cmd_sec.add_option("password", "p", TYPE_STR, False, False, "super_secret", "Database password", None, "", False, True)
+sec_help: str = cmd_sec.format_help(test_con)
+nox.test.assert_true("super_secret" not in sec_help, "Secret default must not be printed in help")
+nox.test.assert_true("******" in sec_help, "Secret default must be masked as ******")
+
+print("cli_advanced_test passed")

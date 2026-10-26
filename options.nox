@@ -1,4 +1,4 @@
-# options.nox — Option and flag definitions.
+# options.nox — Option and flag definitions with environment, choices, and repetition support.
 
 import arguments
 from arguments import TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
@@ -11,6 +11,10 @@ class Option:
     required: bool
     default_val: str
     help: str
+    choices: list[str]
+    env_var: str
+    multiple: bool
+    is_secret: bool
 
     def __init__(
         self: Option,
@@ -20,7 +24,11 @@ class Option:
         is_flag: bool = False,
         required: bool = False,
         default_val: str = "",
-        help: str = ""
+        help: str = "",
+        choices: list[str] | None = None,
+        env_var: str = "",
+        multiple: bool = False,
+        is_secret: bool = False
     ) -> None:
         self.name = name
         self.short_name = short_name
@@ -29,3 +37,10 @@ class Option:
         self.required = required
         self.default_val = default_val
         self.help = help
+        if choices is not None:
+            self.choices = choices
+        else:
+            self.choices = []
+        self.env_var = env_var
+        self.multiple = multiple
+        self.is_secret = is_secret

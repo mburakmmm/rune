@@ -1,4 +1,4 @@
-# arguments.nox — Positional argument declarations and type codes.
+# arguments.nox — Positional argument declarations, type codes, and choice constraints.
 
 TYPE_STR: int = 1
 TYPE_INT: int = 2
@@ -12,6 +12,7 @@ class Argument:
     default_val: str
     help: str
     variadic: bool
+    choices: list[str]
 
     def __init__(
         self: Argument,
@@ -20,7 +21,8 @@ class Argument:
         required: bool = True,
         default_val: str = "",
         help: str = "",
-        variadic: bool = False
+        variadic: bool = False,
+        choices: list[str] | None = None
     ) -> None:
         self.name = name
         self.arg_type = arg_type
@@ -28,3 +30,7 @@ class Argument:
         self.default_val = default_val
         self.help = help
         self.variadic = variadic
+        if choices is not None:
+            self.choices = choices
+        else:
+            self.choices = []

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-10-26
+
+### Added
+- **Choices & Enum Validation (`rune.cli`)**:
+  - `choices: list[str]` validation on `Option` and `Argument`.
+  - Automatically rejects disallowed inputs with exit code 2 and lists valid options in error messages.
+  - Automatically formats allowed choices in `--help` output: `[choices: val1, val2]`.
+- **Environment Variable Sourced Defaults**:
+  - `Option.env_var: str`: binds an environment variable to fallback when option is absent on CLI.
+  - Strict precedence order: `CLI argument > Environment variable > Declared default`.
+  - Displays `[env: VAR_NAME]` in `--help`.
+- **Clustered Short Boolean Flags**:
+  - Cluster short flags (e.g. `-xvf` automatically expands to `-x`, `-v`, `-f`).
+- **Repeated / Multiple Options**:
+  - `Option.multiple: bool`: allows repeated option invocations (e.g. `--include dir1 --include dir2`).
+  - `CliContext.get_list(name: str) -> list[str]` retrieves all accumulated values.
+- **Secret Option Redaction**:
+  - `Option.is_secret: bool`: masks default values in `--help` as `[default: ******]` and prevents leaking in diagnostics.
+- **Command & Subcommand Aliases**:
+  - `Command.add_alias(alias: str)` allows defining command shortcuts (e.g. `git ci` -> `commit`).
+  - Displays aliases in `--help` commands list: `commit (ci, co)`.
+- **Test Suites**:
+  - `tests/unit/cli_advanced_test.nox` covering choices, env vars, clustered flags, repeated options, secrets, and aliases.
+
+---
+
 ## [0.2.0] - 2026-10-26
 
 ### Added

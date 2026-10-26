@@ -185,17 +185,48 @@ def prompt_password(question: str) -> str: ... # Raises PromptError
 
 ---
 
-## 5. `rune.cli`
+## 6. `rune.cli`
 
 ```nox
+class Argument:
+    name: str
+    arg_type: int
+    required: bool
+    default_val: str
+    help: str
+    variadic: bool
+    choices: list[str]
+
+class Option:
+    name: str
+    short_name: str
+    opt_type: int
+    is_flag: bool
+    required: bool
+    default_val: str
+    help: str
+    choices: list[str]
+    env_var: str
+    multiple: bool
+    is_secret: bool
+
 class Command:
     name: str
     description: str
+    aliases: list[str]
 
-    def add_argument(self: Command, name: str, arg_type: int = 1, required: bool = True, default_val: str = "", help: str = "", variadic: bool = False) -> Argument: ...
-    def add_option(self: Command, name: str, short_name: str = "", opt_type: int = 1, is_flag: bool = False, required: bool = False, default_val: str = "", help: str = "") -> Option: ...
+    def add_argument(self: Command, name: str, arg_type: int = 1, required: bool = True, default_val: str = "", help: str = "", variadic: bool = False, choices: list[str] | None = None) -> Argument: ...
+    def add_option(self: Command, name: str, short_name: str = "", opt_type: int = 1, is_flag: bool = False, required: bool = False, default_val: str = "", help: str = "", choices: list[str] | None = None, env_var: str = "", multiple: bool = False, is_secret: bool = False) -> Option: ...
+    def add_alias(self: Command, alias: str) -> None: ...
     def add_subcommand(self: Command, sub: Command) -> None: ...
     def format_help(self: Command, console: Console) -> str: ...
+
+class CliContext:
+    def get_str(self: CliContext, key: str, fallback: str = "") -> str: ...
+    def get_int(self: CliContext, key: str, fallback: int = 0) -> int: ...
+    def get_float(self: CliContext, key: str, fallback: float = 0.0) -> float: ...
+    def get_bool(self: CliContext, key: str, fallback: bool = False) -> bool: ...
+    def get_list(self: CliContext, key: str) -> list[str]: ...
 
 class CliApp:
     root: Command
