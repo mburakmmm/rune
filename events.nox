@@ -230,6 +230,10 @@ class KeyDecoder:
                         continue
                     else:
                         # Incomplete CSI sequence, retain in buffer for next feed()
+                        if n - i > 32:
+                            # runaway malformed CSI sequence; discard ESC to prevent unbounded buffering
+                            i = i + 1
+                            continue
                         self.buffer = raw[i:]
                         break
 

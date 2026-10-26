@@ -23,6 +23,12 @@ class Frame:
     def size(self: Frame) -> Rect:
         return Rect(0, 0, self.width, self.height)
 
+    def set_clip(self: Frame, rect: Rect | None) -> None:
+        self.buffer.set_clip(rect)
+
+    def clear_clip(self: Frame) -> None:
+        self.buffer.set_clip(None)
+
     def write_string(self: Frame, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
         return self.buffer.write_string(x, y, text, style, max_width)
 
@@ -92,41 +98,55 @@ class AppRunner:
             self.input_queue.append(make_key_event(k.key, k.ctrl, k.alt, k.shift))
             idx = idx + 1
 
+    def render_frame(self: AppRunner) -> None:
+        if self.auto_clear:
+            self.driver.current_buffer.clear()
+        frame: Frame = Frame(self.driver.current_buffer)
+        self.app.view(frame)
+        self.driver.flush()
+        self.frame_count = self.frame_count + 1
+
     def process_input_queue(self: AppRunner) -> None:
+        # Check if decoder has a pending isolated ESC
+        if len(self.decoder.buffer) > 0:
+            flushed: list[KeyEvent] = self.decoder.flush()
+            f_idx: int = 0
+            while f_idx < len(flushed):
+                fk: KeyEvent = flushed[f_idx]
+                self.input_queue.append(make_key_event(fk.key, fk.ctrl, fk.alt, fk.shift))
+                f_idx = f_idx + 1
+
         if len(self.input_queue) == 0:
             return
+
         pending: list[Event] = self.input_queue
         self.input_queue = []
+        any_updated: bool = False
         idx: int = 0
         while idx < len(pending) and self.app.running:
             ev: Event = pending[idx]
-            res: bool = self.step(ev)
-            if not res:
-                break
+            keep: bool = self.app.update(ev)
+            if not keep:
+                self.app.running = False
+                return
+            any_updated = True
             idx = idx + 1
+
+        # Batch render: update screen ONCE for the entire batch of events
+        if any_updated and self.app.running:
+            self.render_frame()
 
     def step(self: AppRunner, event: Event) -> bool:
         keep: bool = self.app.update(event)
         if not keep:
             self.app.running = False
             return False
-        if self.auto_clear:
-            self.driver.current_buffer.clear()
-        frame: Frame = Frame(self.driver.current_buffer)
-        self.app.view(frame)
-        self.driver.flush()
-        self.frame_count = self.frame_count + 1
+        self.render_frame()
         return True
 
     def run_event_stream(self: AppRunner, event_list: list[Event]) -> int:
         self.app.init()
-        # Initial render
-        if self.auto_clear:
-            self.driver.current_buffer.clear()
-        frame: Frame = Frame(self.driver.current_buffer)
-        self.app.view(frame)
-        self.driver.flush()
-        self.frame_count = self.frame_count + 1
+        self.render_frame()
 
         i: int = 0
         n: int = len(event_list)
@@ -139,19 +159,12 @@ class AppRunner:
         return self.frame_count
 
     def run_interactive(self: AppRunner, max_frames: int = -1) -> None:
-        # 1. Setup terminal environment
-        self.driver.enter_alt_screen()
-        self.driver.hide_cursor()
+        # 1. Setup terminal environment inside try...finally
         try:
+            self.driver.enter_alt_screen()
+            self.driver.hide_cursor()
             self.app.init()
-
-            # Initial frame
-            if self.auto_clear:
-                self.driver.current_buffer.clear()
-            frame: Frame = Frame(self.driver.current_buffer)
-            self.app.view(frame)
-            self.driver.flush()
-            self.frame_count = self.frame_count + 1
+            self.render_frame()
 
             # 2. Main loop
             while self.app.running:

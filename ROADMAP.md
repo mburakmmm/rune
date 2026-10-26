@@ -28,6 +28,8 @@
 | **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Completed** | `tui_layout_test` (20 suites) |
 | **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Completed** | `tui_widgets_test` (21 suites) |
 | **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Completed** | `tui_app_test` (22 suites) |
+| **Phase 10.1: TUI Hardening** | `v1.4.1` | Try-finally recovery, input queue, stateful key decoder, frame clearing | **Completed** | `tui_app_test` (22 suites) |
+| **Phase 10.2: Batching & Clipping** | `v1.4.2` | Event batching, global 2D clipping, buffer caps, setup protection | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
 
 ---
 
@@ -359,6 +361,26 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - Interactive system monitor / process dashboard example in `examples/tui_dashboard.nox`.
 - [x] **Comprehensive Test Suite**:
   - Added `tests/unit/tui_app_test.nox` (22 suites total).
+
+---
+
+### 🛡️ v1.4.1 & v1.4.2 — TUI Runtime Hardening & Global Clipping (Completed)
+**Goal:** Harden the TUI framework based on deep static analysis, eliminating ghosting, runaway memory, redraw storms, and widget boundary overflows.
+
+- [x] **Guaranteed Terminal Restoration**:
+  - `AppRunner.run_interactive()` wraps all terminal mutation (`enter_alt_screen()`, `hide_cursor()`, and the event loop) in `try ... finally: self.driver.restore()`.
+- [x] **Input Queue & Event Batching**:
+  - `input_queue: list[Event]` buffers asynchronous input bursts.
+  - `process_input_queue()` batches all pending events, calling `app.update(ev)` sequentially and invoking `render_frame()` only once per batch.
+- [x] **Stateful Fragmented Key Decoder & Buffer Bounds**:
+  - Handles escape sequences split across `feed()` chunks.
+  - Automatic `flush()` on tick for trailing standalone `ESC`.
+  - Buffer length cap prevents runaway allocations on malformed escape sequences.
+- [x] **Global 2D Clipping Engine**:
+  - Added `clip_rect: Rect | None` and `set_clip()` to `ScreenBuffer` and `Frame`.
+  - `set()`, `write_string()`, and `fill_rect()` strictly obey clipping bounds, preventing any widget from leaking into neighboring panes.
+- [x] **Frame Auto-Clearing**:
+  - `auto_clear = True` ensures clean frame-by-frame redraws without ghosting artifacts.
 
 ---
 

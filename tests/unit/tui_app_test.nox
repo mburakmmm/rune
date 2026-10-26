@@ -177,7 +177,7 @@ flushed: list[KeyEvent] = stateful_dec.flush()
 nox.test.assert_eq_int(len(flushed), 1, "flush emits esc key")
 nox.test.assert_eq_str(flushed[0].key, "esc", "flushed key is esc")
 
-# 6. AppRunner Input Queue Tests
+# 6. AppRunner Input Queue Tests & Batch Rendering
 q_app: CounterApp = CounterApp()
 q_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
 q_runner: AppRunner = AppRunner(q_app, q_driver, 50)
@@ -190,5 +190,24 @@ nox.test.assert_eq_int(len(q_runner.input_queue), 3, "three queued events in run
 q_runner.process_input_queue()
 nox.test.assert_eq_int(len(q_runner.input_queue), 0, "input queue drained")
 nox.test.assert_true(not q_app.running, "q processed from queue terminated app")
+
+# 7. Batch Rendering Test
+batch_app: CounterApp = CounterApp()
+batch_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+batch_runner: AppRunner = AppRunner(batch_app, batch_driver, 50)
+batch_app.init()
+batch_runner.render_frame()
+nox.test.assert_eq_int(batch_runner.frame_count, 1, "initial frame rendered")
+batch_runner.queue_key("up")
+batch_runner.queue_key("up")
+batch_runner.queue_key("up")
+batch_runner.process_input_queue()
+nox.test.assert_eq_int(batch_runner.frame_count, 2, "batch processing 3 keys only triggers 1 additional render")
+nox.test.assert_eq_int(batch_app.count, 13, "counter incremented 3 times")
+
+# 8. Runaway Malformed CSI Buffer Cap Test
+malformed_dec: KeyDecoder = KeyDecoder()
+malformed_dec.feed(ESC + "[1234567890123456789012345678901234567890")
+nox.test.assert_true(len(malformed_dec.buffer) <= 32, "runaway CSI sequence does not exceed buffer cap")
 
 print("tui_app_test passed")

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.2] - 2026-10-26
+
+### Added & Hardened (GPT 5.6 Audit Hardening for Event Batching, Global Clipping, and Robust Setup)
+- **[P1] Event Batching in `AppRunner`**:
+  - `process_input_queue()` now processes all pending queued events in batch by invoking `app.update(ev)` sequentially and executing a single `render_frame()` at the end of the batch. This eliminates redundant frame redraws when processing high-volume keystroke or stream bursts.
+- **[P1] Global 2D Clipping Engine (`ScreenBuffer.set_clip` / `Frame.set_clip`)**:
+  - Added native clipping rectangle support to `ScreenBuffer` (`clip_rect: Rect | None`).
+  - `set()`, `write_string()`, and `fill_rect()` strictly respect the active clipping rectangle. Content originating from any widget (`TableWidget`, `Tabs`, `Paragraph`, etc.) is guaranteed never to spill outside its designated bounding area.
+- **[P1] Automatic ESC Timeout & Buffer Bounds in `KeyDecoder`**:
+  - Isolated trailing `ESC` keys are automatically flushed and enqueued on frame tick.
+  - Buffer length cap prevents runaway allocations on malformed escape sequences.
+- **[P0] Complete Terminal Setup Protection**:
+  - `enter_alt_screen()` and `hide_cursor()` now reside inside the guaranteed `try ... finally` block, ensuring `restore()` executes under all circumstances.
+
+---
+
 ## [1.4.1] - 2026-10-26
 
 ### Fixed & Hardened (GPT 5.6 Audit Hardening for TUI Runtime & Widgets)

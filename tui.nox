@@ -52,6 +52,7 @@ class ScreenBuffer:
     width: int
     height: int
     cells: list[Cell]
+    clip_rect: Rect | None
 
     def __init__(self: ScreenBuffer, width: int, height: int) -> None:
         if width < 1:
@@ -61,11 +62,20 @@ class ScreenBuffer:
         self.width = width
         self.height = height
         self.cells = []
+        self.clip_rect = None
         total: int = width * height
         i: int = 0
         while i < total:
             self.cells.append(Cell(" ", None, 1))
             i = i + 1
+
+    def set_clip(self: ScreenBuffer, rect: Rect | None) -> None:
+
+        self.clip_rect = rect
+
+    def get_clip(self: ScreenBuffer) -> Rect | None:
+
+        return self.clip_rect
 
     def get(self: ScreenBuffer, x: int, y: int) -> Cell:
 
@@ -75,8 +85,13 @@ class ScreenBuffer:
         return self.cells[idx]
 
     def set(self: ScreenBuffer, x: int, y: int, char: str, style: Style | None = None) -> None:
+
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
+        cr: Rect | None = self.clip_rect
+        if cr != None:
+            if not cr.contains(x, y):
+                return
         idx: int = y * self.width + x
         w: int = char_width(char)
         if w <= 0:
@@ -115,12 +130,25 @@ class ScreenBuffer:
             self.cells[idx] = Cell(char, style, 1)
 
     def write_string(self: ScreenBuffer, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
+
         if y < 0 or y >= self.height:
             return x
+        cur_x: int = x
+        cr2: Rect | None = self.clip_rect
+        if cr2 != None:
+            if y < cr2.y or y >= cr2.y + cr2.height:
+                return x
+            if cur_x < cr2.x:
+                cur_x = cr2.x
+            clip_rem: int = cr2.x + cr2.width - cur_x
+            if clip_rem <= 0:
+                return cur_x
+            if max_width < 0 or max_width > clip_rem:
+                max_width = clip_rem
+
         st: Style = Style()
         if style != None:
             st = style
-        cur_x: int = x
         written_cells: int = 0
         i: int = 0
         n: int = len(text)
@@ -145,6 +173,16 @@ class ScreenBuffer:
         return cur_x
 
     def fill_rect(self: ScreenBuffer, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
+
+        cr3: Rect | None = self.clip_rect
+        if cr3 != None:
+            r_inter: Rect = Rect(x, y, w, h).intersection(cr3)
+            x = r_inter.x
+            y = r_inter.y
+            w = r_inter.width
+            h = r_inter.height
+            if w <= 0 or h <= 0:
+                return
 
         st: Style = Style()
         if style != None:
@@ -178,6 +216,7 @@ class ScreenBuffer:
         return b
 
     def resize(self: ScreenBuffer, new_w: int, new_h: int) -> None:
+
         if new_w < 1:
             new_w = 1
         if new_h < 1:
@@ -208,6 +247,7 @@ class ScreenBuffer:
         self.cells = new_cells
 
     def to_text(self: ScreenBuffer) -> str:
+
         lines: list[str] = []
         y: int = 0
         while y < self.height:
@@ -252,6 +292,7 @@ class TerminalDriver:
         self.previous_buffer = ScreenBuffer(width, height)
 
     def write_raw(self: TerminalDriver, s: str) -> None:
+
         if len(s) == 0:
             return
         if self.capture_mode:
@@ -405,6 +446,7 @@ class TerminalDriver:
         self.current_buffer.fill_rect(x, y, w, h, char, style)
 
     def resize(self: TerminalDriver, width: int, height: int) -> None:
+
         self.current_buffer.resize(width, height)
         self.previous_buffer.resize(width, height)
         # Clear previous buffer so next flush() triggers a full redraw of the new terminal bounds

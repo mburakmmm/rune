@@ -184,4 +184,28 @@ buf_mini.write_string(0, 1, "CD")
 txt: str = buf_mini.to_text()
 nox.test.assert_eq_str(txt, "AB   \nCD   ", "buffer to_text outputs rows separated by newline")
 
+# 9. ScreenBuffer Global Clipping Tests
+buf_clip: ScreenBuffer = ScreenBuffer(10, 5)
+buf_clip.set_clip(Rect(2, 1, 4, 3))
+# Try to write outside clip bounds
+buf_clip.set(0, 0, "X")
+nox.test.assert_eq_str(buf_clip.get(0, 0).char, " ", "cell outside clip_rect remains untouched")
+
+# Write inside clip bounds
+buf_clip.set(3, 2, "Y")
+nox.test.assert_eq_str(buf_clip.get(3, 2).char, "Y", "cell inside clip_rect is written")
+
+# Write string starting outside clip bound
+buf_clip.write_string(0, 2, "ABCDEFGH")
+nox.test.assert_eq_str(buf_clip.get(1, 2).char, " ", "prefix before clip_rect left bound untouched")
+nox.test.assert_eq_str(buf_clip.get(2, 2).char, "A", "first clipped character written at clip left")
+nox.test.assert_eq_str(buf_clip.get(6, 2).char, " ", "suffix after clip_rect right bound untouched")
+
+# Fill rect clipped
+buf_clip.fill_rect(0, 0, 10, 5, "#")
+nox.test.assert_eq_str(buf_clip.get(0, 0).char, " ", "fill_rect clipped at top-left")
+nox.test.assert_eq_str(buf_clip.get(2, 1).char, "#", "fill_rect fills inside clip_rect")
+
+buf_clip.set_clip(None)
+
 print("tui_widgets_test passed")
