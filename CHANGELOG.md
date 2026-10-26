@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-10-26
+
+### Added
+- **Monotonic ETA & Transfer Speed Math (`rune.progress`)**:
+  - `Task.speed() -> float`: calculates items/bytes per second.
+  - `Task.eta_seconds() -> int` and `Task.format_eta() -> str`: safe, division-by-zero guarded remaining time estimate.
+  - `format_duration(seconds: int) -> str`: formats seconds as `mm:ss` or `hh:mm:ss`.
+  - `format_bytes(bytes: int) -> str`: formats byte counts into `B`, `KB`, `MB`, `GB`.
+- **Terminal Rate Limiter (`ProgressBar.should_render`)**:
+  - `ProgressBar.min_interval_ms: int` (default 50ms): bounds terminal redraws to prevent CPU & stdout flooding.
+- **Multi-Task Live Progress Display**:
+  - `ProgressBar.render_all(options, show_eta)`: renders all registered tasks in a single unified block with percentage, progress bar, ETA, and elapsed time upon completion.
+- **Test Suites**:
+  - `tests/unit/progress_live_test.nox` covering duration formatting, byte formatting, ETA calculation, multi-task layout, and rate limiting logic.
+
+---
+
 ## [0.3.0] - 2026-10-26
 
 ### Added

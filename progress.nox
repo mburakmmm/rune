@@ -1,32 +1,66 @@
-# progress.nox — Deterministic progress bars, tasks, and spinner status indicators.
+# progress.nox — Deterministic progress bars, multi-task live layout, ETA/speed calculations, and spinners.
 
 import nox.strings
 import nox.time
 import core
 from core import Style, ConsoleOptions, cell_width
 
+def pad_num(n: int, width: int = 2) -> str:
+    s: str = str(n)
+    return nox.strings.pad_left(s, width, "0")
+
+def format_duration(seconds: int) -> str:
+    if seconds < 0:
+        return "--:--"
+    m: int = seconds // 60
+    s: int = seconds % 60
+    if m >= 60:
+        h: int = m // 60
+        m = m % 60
+        return pad_num(h, 2) + ":" + pad_num(m, 2) + ":" + pad_num(s, 2)
+    return pad_num(m, 2) + ":" + pad_num(s, 2)
+
+def format_bytes(b: int) -> str:
+    if b < 1024:
+        return str(b) + " B"
+    if b < 1024 * 1024:
+        kb: int = b // 1024
+        return str(kb) + " KB"
+    if b < 1024 * 1024 * 1024:
+        mb: int = b // (1024 * 1024)
+        return str(mb) + " MB"
+    gb: int = b // (1024 * 1024 * 1024)
+    return str(gb) + " GB"
+
 class Task:
     name: str
     total: int
     completed: int
     finished: bool
+    unit: str
     start_time_ms: int
+    last_update_ms: int
 
-    def __init__(self: Task, name: str, total: int = 100) -> None:
+    def __init__(self: Task, name: str, total: int = 100, unit: str = "items") -> None:
         self.name = name
         self.total = total
         self.completed = 0
         self.finished = False
-        self.start_time_ms = nox.time.now_ms()
+        self.unit = unit
+        now: int = nox.time.now_ms()
+        self.start_time_ms = now
+        self.last_update_ms = now
 
     def advance(self: Task, step: int = 1) -> None:
         self.completed = self.completed + step
+        self.last_update_ms = nox.time.now_ms()
         if self.total > 0 and self.completed >= self.total:
             self.completed = self.total
             self.finished = True
 
     def update(self: Task, completed: int) -> None:
         self.completed = completed
+        self.last_update_ms = nox.time.now_ms()
         if self.total > 0 and self.completed >= self.total:
             self.completed = self.total
             self.finished = True
@@ -42,29 +76,75 @@ class Task:
     def is_finished(self: Task) -> bool:
         return self.finished
 
+    def elapsed_ms(self: Task) -> int:
+        return nox.time.now_ms() - self.start_time_ms
+
+    def elapsed_seconds(self: Task) -> int:
+        return self.elapsed_ms() // 1000
+
+    def speed(self: Task) -> float:
+        el_ms: int = self.elapsed_ms()
+        if el_ms <= 0:
+            return 0.0
+        return (float(self.completed) * 1000.0) / float(el_ms)
+
+    def eta_seconds(self: Task) -> int:
+        if self.finished or self.completed >= self.total:
+            return 0
+        rem: int = self.total - self.completed
+        if rem <= 0:
+            return 0
+        spd: float = self.speed()
+        if spd <= 0.001:
+            return -1
+        return int(float(rem) / spd)
+
+    def format_eta(self: Task) -> str:
+        s: int = self.eta_seconds()
+        if s < 0:
+            return "--:--"
+        return format_duration(s)
+
 class ProgressBar:
     tasks: list[Task]
     width: int
     bar_char: str
     empty_char: str
+    min_interval_ms: int
+    last_render_ms: int
 
     def __init__(
         self: ProgressBar,
         width: int = 20,
         bar_char: str = "█",
-        empty_char: str = "─"
+        empty_char: str = "─",
+        min_interval_ms: int = 50
     ) -> None:
         self.tasks = []
         self.width = width
         self.bar_char = bar_char
         self.empty_char = empty_char
+        self.min_interval_ms = min_interval_ms
+        self.last_render_ms = 0
 
-    def add_task(self: ProgressBar, name: str, total: int = 100) -> Task:
-        t: Task = Task(name, total)
+    def add_task(self: ProgressBar, name: str, total: int = 100, unit: str = "items") -> Task:
+        t: Task = Task(name, total, unit)
         self.tasks.append(t)
         return t
 
-    def render_task(self: ProgressBar, task: Task, options: ConsoleOptions) -> str:
+    def should_render(self: ProgressBar) -> bool:
+        now: int = nox.time.now_ms()
+        if now - self.last_render_ms >= self.min_interval_ms:
+            self.last_render_ms = now
+            return True
+        return False
+
+    def render_task(
+        self: ProgressBar,
+        task: Task,
+        options: ConsoleOptions,
+        show_eta: bool = True
+    ) -> str:
         use_ascii: bool = not options.supports_unicode
         b_char: str = self.bar_char
         e_char: str = self.empty_char
@@ -92,7 +172,22 @@ class ProgressBar:
         if task.total <= 0:
             stats = "(" + str(task.completed) + " items)"
 
-        return bar_visual + " " + stats + " " + task.name
+        eta_part: str = ""
+        if show_eta and task.total > 0:
+            if task.finished:
+                eta_part = " [Done in " + format_duration(task.elapsed_seconds()) + "]"
+            else:
+                eta_part = " [ETA: " + task.format_eta() + "]"
+
+        return bar_visual + " " + stats + eta_part + " " + task.name
+
+    def render_all(self: ProgressBar, options: ConsoleOptions, show_eta: bool = True) -> str:
+        lines: list[str] = []
+        i: int = 0
+        while i < len(self.tasks):
+            lines.append(self.render_task(self.tasks[i], options, show_eta))
+            i = i + 1
+        return nox.strings.join(lines, "\n")
 
 class Spinner:
     frames_unicode: list[str]
@@ -117,7 +212,6 @@ class Spinner:
 
     def render(self: Spinner, options: ConsoleOptions) -> str:
         if not options.is_tty:
-            # Plain textual status for CI/non-TTY
             return "[STATUS] " + self.message
         frame: str = self.next_frame(options.supports_unicode)
         if len(self.message) > 0:

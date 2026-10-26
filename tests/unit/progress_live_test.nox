@@ -1,0 +1,57 @@
+# tests/unit/progress_live_test.nox — Tests for rate limiting, ETA/speed calculations, and multi-task layouts.
+
+import nox.test
+import core
+from core import ConsoleOptions
+import progress
+from progress import Task, ProgressBar, format_duration, format_bytes
+
+opts: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+
+# 1. format_duration tests
+nox.test.assert_eq_str(format_duration(0), "00:00", "Zero duration is 00:00")
+nox.test.assert_eq_str(format_duration(45), "00:45", "45 seconds formatted as 00:45")
+nox.test.assert_eq_str(format_duration(125), "02:05", "125 seconds formatted as 02:05")
+nox.test.assert_eq_str(format_duration(3661), "01:01:01", "3661 seconds formatted as 01:01:01")
+
+# 2. format_bytes tests
+nox.test.assert_eq_str(format_bytes(512), "512 B", "Bytes under 1KB")
+nox.test.assert_eq_str(format_bytes(2048), "2 KB", "2048 bytes formatted as 2 KB")
+nox.test.assert_eq_str(format_bytes(10485760), "10 MB", "10 MB formatted correctly")
+
+# 3. Task elapsed and ETA
+t: Task = Task("Download", 1000)
+t.advance(500)
+nox.test.assert_true(t.elapsed_ms() >= 0, "Elapsed ms must be non-negative")
+eta_str: str = t.format_eta()
+nox.test.assert_true(len(eta_str) >= 5, "ETA string must be formatted")
+
+t.update(1000)
+nox.test.assert_true(t.is_finished(), "Task marked finished at 1000")
+nox.test.assert_eq_int(t.eta_seconds(), 0, "ETA is 0 when finished")
+
+# 4. Multi-task layout rendering
+pb: ProgressBar = ProgressBar(15)
+task1: Task = pb.add_task("Downloading kernel", 100)
+task2: Task = pb.add_task("Downloading initrd", 50)
+
+task1.update(50)
+task2.update(50)
+
+rendered_multi: str = pb.render_all(opts)
+nox.test.assert_true("Downloading kernel" in rendered_multi, "Multi-task must contain task 1")
+nox.test.assert_true("Downloading initrd" in rendered_multi, "Multi-task must contain task 2")
+nox.test.assert_true("50%" in rendered_multi, "Multi-task must show task 1 percentage")
+nox.test.assert_true("100%" in rendered_multi, "Multi-task must show task 2 percentage")
+
+# 5. Rate limiting logic
+pb_limit: ProgressBar = ProgressBar(20, "█", "─", 100)
+# First call should succeed and record timestamp
+first_render: bool = pb_limit.should_render()
+nox.test.assert_true(first_render, "Initial should_render must be True")
+
+# Immediate second call should be throttled (within 100ms)
+second_render: bool = pb_limit.should_render()
+nox.test.assert_true(not second_render, "Immediate consecutive should_render must be throttled")
+
+print("progress_live_test passed")

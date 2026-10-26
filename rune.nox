@@ -22,7 +22,7 @@ import render
 from render import Rule as RenderRule, Panel as RenderPanel, Table as RenderTable, Tree as RenderTree
 
 import progress
-from progress import Task, ProgressBar, Spinner
+from progress import Task, ProgressBar, Spinner, format_duration, format_bytes, pad_num
 
 import prompt
 from prompt import prompt_text, confirm, select_choice, prompt_password, PromptError, NonInteractiveError

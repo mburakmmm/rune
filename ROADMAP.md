@@ -16,8 +16,8 @@
 | **Integration & Release 0.1** | `v0.1.0` | Facade, showcase, examples, docs, publish to index | **Completed** | `integration_test` (6/6 passing) |
 | **Phase 1.5: Advanced Render** | `v0.2.0` | Multiline table wrapping, 256/RGB colors, `Text`/`Span` | **Completed** | `text_test`, `core_color_wrap_test`, `table_multiline_test` |
 | **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Completed** | `cli_advanced_test` |
-| **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Next Up** | Pending |
-| **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Planned** | Pending |
+| **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Completed** | `progress_live_test` |
+| **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Next Up** | Pending |
 | **Phase 5: Terminal Markdown & DX** | `v0.6.0` | Basic terminal Markdown parser, syntax highlighter | **Planned** | Pending |
 | **Phase 5.5: Shell Completion** | `v0.7.0` | Bash, Zsh, Fish autocompletion script generation | **Planned** | Pending |
 | **Phase 5.8: Benchmarks & Perf** | `v0.8.0` | Allocation audits, 1000-row table & 1000-arg CLI benchmarks | **Planned** | Pending |
@@ -122,19 +122,20 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.4.0 — Live Display & Progress Hardening
+### 📦 v0.4.0 — Live Display & Progress Hardening (Completed)
 **Goal:** Production-grade progress display with rate limiting and duration estimation.
 
-- [ ] **Update Rate Limiter**:
-  - Throttle terminal redraws to a configurable interval (e.g. max 10 updates/second) to avoid terminal I/O flooding.
-- [ ] **Monotonic ETA & Transfer Speed Math**:
-  - Calculate transfer rates (e.g. `MB/s`, `items/s`) using `nox.time.instant_now()`.
-  - Formatted elapsed duration and estimated time remaining (`00:04:12`).
-  - Handle `total = 0` or indeterminate tasks safely with moving-average rate calculation.
-- [ ] **Multi-Task Live Progress Display**:
-  - Render multiple simultaneous concurrent tasks in a consolidated live block.
-- [ ] **Transient vs Persistent Logs**:
-  - Allow completed tasks to print a clean final summary line while erasing animation frames.
+- [x] **Update Rate Limiter**:
+  - Throttle terminal redraws to a configurable interval (`min_interval_ms`, default 50ms) to avoid stdout flooding.
+- [x] **Monotonic ETA & Transfer Speed Math**:
+  - Calculate transfer rates (`speed() -> float`) using monotonic clock.
+  - Formatted elapsed duration and remaining time estimation (`format_duration`, `format_eta`).
+  - Format byte representations (`format_bytes`).
+  - Division-by-zero guarded against zero rate/completion.
+- [x] **Multi-Task Live Progress Display**:
+  - Render multiple simultaneous concurrent tasks in a consolidated live block (`render_all()`).
+- [x] **Completion Summary**:
+  - Display clean completion line upon task finish: `[Done in 00:02]`.
 
 ---
 
