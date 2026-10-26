@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Nox Language Documentation
+    url: https://noxlang.com
+    about: Official Nox programming language documentation, stdlib, and guides.
+  - name: Nox Compiler Issues
+    url: https://github.com/mburakmmm/nox-lang/issues
+    about: Report issues or request runtime features for the Nox compiler/runtime.

@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest an idea or enhancement for Rune
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We welcome feature requests and proposals for Rune! Please ensure the request adheres to the project's non-goals (e.g. no C native shims without approval, pure Nox, explicit exit codes).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target Component
+      description: Which part of Rune would this feature affect?
+      options:
+        - "rune.tui (Widgets, Buffer, Layout, Runtime)"
+        - "rune.cli (Commands, Options, Arguments, Completion)"
+        - "rune.render (Tables, Panels, Trees, Rules, Markdown)"
+        - "rune.core (Console, Styles, ANSI, Width)"
+        - "rune.progress (Progress Bars, Spinners)"
+        - "rune.prompt (Interactive Prompts, Selection)"
+        - "Other / Cross-Cutting"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear description of what the problem is.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / API Design
+      description: Describe the solution or show candidate Nox API syntax.
+      render: nox
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions Considered
+      description: Any alternative options or workarounds you have considered.
