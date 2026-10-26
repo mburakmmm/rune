@@ -23,11 +23,20 @@ class Frame:
     def size(self: Frame) -> Rect:
         return Rect(0, 0, self.width, self.height)
 
+    def push_clip(self: Frame, rect: Rect) -> None:
+        self.buffer.push_clip(rect)
+
+    def pop_clip(self: Frame) -> None:
+        self.buffer.pop_clip()
+
     def set_clip(self: Frame, rect: Rect | None) -> None:
         self.buffer.set_clip(rect)
 
     def clear_clip(self: Frame) -> None:
         self.buffer.set_clip(None)
+
+    def get_clip(self: Frame) -> Rect | None:
+        return self.buffer.get_clip()
 
     def write_string(self: Frame, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
         return self.buffer.write_string(x, y, text, style, max_width)
@@ -63,6 +72,8 @@ class AppRunner:
     decoder: KeyDecoder
     auto_clear: bool
     input_queue: list[Event]
+    esc_timeout_ms: int
+    esc_pending_ms: int
 
     def __init__(
         self: AppRunner,
@@ -83,6 +94,8 @@ class AppRunner:
         self.decoder = KeyDecoder()
         self.auto_clear = auto_clear
         self.input_queue = []
+        self.esc_timeout_ms = 50
+        self.esc_pending_ms = 0
 
     def queue_event(self: AppRunner, ev: Event) -> None:
         self.input_queue.append(ev)
@@ -97,6 +110,8 @@ class AppRunner:
             k: KeyEvent = keys[idx]
             self.input_queue.append(make_key_event(k.key, k.ctrl, k.alt, k.shift))
             idx = idx + 1
+        if len(self.decoder.buffer) > 0:
+            self.esc_pending_ms = 0
 
     def render_frame(self: AppRunner) -> None:
         if self.auto_clear:
@@ -106,8 +121,15 @@ class AppRunner:
         self.driver.flush()
         self.frame_count = self.frame_count + 1
 
-    def process_input_queue(self: AppRunner) -> None:
-        # Check if decoder has a pending isolated ESC
+    def check_esc_timeout(self: AppRunner, delta_ms: int) -> None:
+        if len(self.decoder.buffer) > 0:
+            self.esc_pending_ms = self.esc_pending_ms + delta_ms
+            if self.esc_pending_ms >= self.esc_timeout_ms:
+                self.flush_pending_input()
+        else:
+            self.esc_pending_ms = 0
+
+    def flush_pending_input(self: AppRunner) -> None:
         if len(self.decoder.buffer) > 0:
             flushed: list[KeyEvent] = self.decoder.flush()
             f_idx: int = 0
@@ -115,7 +137,9 @@ class AppRunner:
                 fk: KeyEvent = flushed[f_idx]
                 self.input_queue.append(make_key_event(fk.key, fk.ctrl, fk.alt, fk.shift))
                 f_idx = f_idx + 1
+            self.esc_pending_ms = 0
 
+    def process_input_queue(self: AppRunner) -> None:
         if len(self.input_queue) == 0:
             return
 
@@ -125,10 +149,12 @@ class AppRunner:
         idx: int = 0
         while idx < len(pending) and self.app.running:
             ev: Event = pending[idx]
+            if ev.is_tick():
+                self.check_esc_timeout(ev.delta_ms)
             keep: bool = self.app.update(ev)
             if not keep:
                 self.app.running = False
-                return
+                break
             any_updated = True
             idx = idx + 1
 
@@ -137,6 +163,8 @@ class AppRunner:
             self.render_frame()
 
     def step(self: AppRunner, event: Event) -> bool:
+        if event.is_tick():
+            self.check_esc_timeout(event.delta_ms)
         keep: bool = self.app.update(event)
         if not keep:
             self.app.running = False
@@ -156,6 +184,9 @@ class AppRunner:
             if not res:
                 break
             i = i + 1
+
+        self.flush_pending_input()
+        self.process_input_queue()
         return self.frame_count
 
     def run_interactive(self: AppRunner, max_frames: int = -1) -> None:
@@ -170,6 +201,7 @@ class AppRunner:
             while self.app.running:
                 if max_frames >= 0 and self.frame_count >= max_frames:
                     break
+                self.check_esc_timeout(self.tick_rate_ms)
                 self.process_input_queue()
                 if not self.app.running:
                     break

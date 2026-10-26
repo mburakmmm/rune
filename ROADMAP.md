@@ -30,6 +30,7 @@
 | **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Completed** | `tui_app_test` (22 suites) |
 | **Phase 10.1: TUI Hardening** | `v1.4.1` | Try-finally recovery, input queue, stateful key decoder, frame clearing | **Completed** | `tui_app_test` (22 suites) |
 | **Phase 10.2: Batching & Clipping** | `v1.4.2` | Event batching, global 2D clipping, buffer caps, setup protection | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
+| **Phase 10.3: Precision Clipping & Delays** | `v1.4.3` | Left-clip offsets, wide Unicode boundary integrity, clip stack, escape delay | **Completed** | `tui_widgets_test`, `tui_app_test`, `tui_layout_test` (22 suites) |
 
 ---
 
@@ -381,6 +382,26 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - `set()`, `write_string()`, and `fill_rect()` strictly obey clipping bounds, preventing any widget from leaking into neighboring panes.
 - [x] **Frame Auto-Clearing**:
   - `auto_clear = True` ensures clean frame-by-frame redraws without ghosting artifacts.
+
+---
+
+### 🛡️ v1.4.3 — Precision Clipping, Unicode Boundaries & Escape Delay (Completed)
+**Goal:** Address subtle edge cases in left-aligned string clipping, wide Unicode characters straddling clip boundaries, nested clipping stacks, and escape sequence timing.
+
+- [x] **Left-Clipping Character Offset Alignment**:
+  - `ScreenBuffer.write_string()` skips characters whose virtual span falls strictly before `clip_rect.x` based on their display cell width (`char_width`).
+  - Tested with `"ABCDEFGHIJ"` starting at `x=0` with `clip_rect.x = 5`, rendering `"FGHIJ"` at columns 5..9.
+- [x] **Wide Unicode Boundary Straddling**:
+  - `ScreenBuffer.set()` verifies that both column `x` and column `x + 1` fall strictly within the active `clip_rect` before writing a 2-cell wide character.
+  - If a wide character straddles the right clipping edge, cell `x` receives a single space `" "` and cell `x + 1` is preserved untouched.
+  - If a wide character straddles the left clipping edge in `write_string()`, cell `clip_rect.x` receives a space `" "` to prevent orphan half-glyphs.
+- [x] **Nested Clip Stack Engine**:
+  - Added `push_clip(rect)` and `pop_clip()` on `ScreenBuffer` and `Frame`.
+  - Pushed rectangles are automatically intersected with parent clipping regions, guaranteeing child widgets can never escape parent containers.
+- [x] **Deterministic Escape Delay Timing**:
+  - `AppRunner` introduces configurable `esc_timeout_ms = 50` and elapsed time tracking.
+  - Fragmented escape sequences split across chunks complete seamlessly without generating spurious standalone `ESC` events.
+  - Standalone `ESC` keys flush only after the 50ms escape delay expires or upon explicit flush.
 
 ---
 

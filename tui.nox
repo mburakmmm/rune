@@ -53,6 +53,7 @@ class ScreenBuffer:
     height: int
     cells: list[Cell]
     clip_rect: Rect | None
+    clip_stack: list[Rect]
 
     def __init__(self: ScreenBuffer, width: int, height: int) -> None:
         if width < 1:
@@ -63,15 +64,46 @@ class ScreenBuffer:
         self.height = height
         self.cells = []
         self.clip_rect = None
+        self.clip_stack = []
         total: int = width * height
         i: int = 0
         while i < total:
             self.cells.append(Cell(" ", None, 1))
             i = i + 1
 
+    def push_clip(self: ScreenBuffer, rect: Rect) -> None:
+
+        effective: Rect = rect
+        cr: Rect | None = self.clip_rect
+        if cr != None:
+            effective = cr.intersection(rect)
+        self.clip_stack.append(effective)
+        self.clip_rect = effective
+
+    def pop_clip(self: ScreenBuffer) -> None:
+
+        if len(self.clip_stack) > 0:
+            new_stack: list[Rect] = []
+            idx: int = 0
+            while idx < len(self.clip_stack) - 1:
+                new_stack.append(self.clip_stack[idx])
+                idx = idx + 1
+            self.clip_stack = new_stack
+            if len(self.clip_stack) > 0:
+                self.clip_rect = self.clip_stack[len(self.clip_stack) - 1]
+            else:
+                self.clip_rect = None
+        else:
+            self.clip_rect = None
+
     def set_clip(self: ScreenBuffer, rect: Rect | None) -> None:
 
-        self.clip_rect = rect
+        if rect == None:
+            self.clip_stack = []
+            self.clip_rect = None
+        else:
+            self.clip_stack = [rect]
+            self.clip_rect = rect
 
     def get_clip(self: ScreenBuffer) -> Rect | None:
 
@@ -118,6 +150,14 @@ class ScreenBuffer:
                 self.cells[idx] = Cell(" ", None, 1)
                 return
 
+            # Check if continuation cell (x + 1) leaks outside the active clip rect
+            if cr != None:
+                if not cr.contains(x + 1, y):
+                    # Wide character cannot fit within clip rect without leaking into x+1!
+                    # Place a single space at x to keep clipping bounds strictly preserved
+                    self.cells[idx] = Cell(" ", None, 1)
+                    return
+
             # Check if cell at (x + 1) is itself a wide char or continuation
             next_idx2: int = y * self.width + (x + 1)
             if self.cells[next_idx2].width == 2 and x + 2 < self.width:
@@ -133,44 +173,70 @@ class ScreenBuffer:
 
         if y < 0 or y >= self.height:
             return x
-        cur_x: int = x
+
+        min_x: int = 0
+        max_x: int = self.width
         cr2: Rect | None = self.clip_rect
         if cr2 != None:
             if y < cr2.y or y >= cr2.y + cr2.height:
                 return x
-            if cur_x < cr2.x:
-                cur_x = cr2.x
-            clip_rem: int = cr2.x + cr2.width - cur_x
-            if clip_rem <= 0:
-                return cur_x
-            if max_width < 0 or max_width > clip_rem:
-                max_width = clip_rem
+            min_x = cr2.x
+            if min_x < 0:
+                min_x = 0
+            max_x = cr2.x + cr2.width
+            if max_x > self.width:
+                max_x = self.width
+
+        if max_width >= 0:
+            max_allowed_x: int = x + max_width
+            if max_allowed_x < max_x:
+                max_x = max_allowed_x
+
+        if max_x <= min_x:
+            return x
 
         st: Style = Style()
         if style != None:
             st = style
-        written_cells: int = 0
+
+        target_x: int = x
         i: int = 0
         n: int = len(text)
         while i < n:
-            if cur_x >= self.width:
-                break
-            if max_width >= 0 and written_cells >= max_width:
+            if target_x >= max_x:
                 break
             ch: str = text[i]
             w: int = char_width(ch)
             if w <= 0:
                 i = i + 1
                 continue
-            if cur_x + w > self.width:
+
+            # If character is strictly to the left of the clip window, skip it:
+            if target_x + w <= min_x:
+                target_x = target_x + w
+                i = i + 1
+                continue
+
+            # If wide character straddles the left clip boundary:
+            if target_x < min_x:
+                if min_x < max_x:
+                    self.set(min_x, y, " ", st)
+                target_x = target_x + w
+                i = i + 1
+                continue
+
+            # target_x >= min_x: check right clip boundary
+            if target_x + w > max_x:
+                if target_x < max_x:
+                    self.set(target_x, y, " ", st)
+                target_x = target_x + w
                 break
-            if max_width >= 0 and written_cells + w > max_width:
-                break
-            self.set(cur_x, y, ch, st)
-            cur_x = cur_x + w
-            written_cells = written_cells + w
+
+            self.set(target_x, y, ch, st)
+            target_x = target_x + w
             i = i + 1
-        return cur_x
+
+        return target_x
 
     def fill_rect(self: ScreenBuffer, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
 
@@ -213,6 +279,12 @@ class ScreenBuffer:
         while i < n:
             b.cells[i] = self.cells[i].clone()
             i = i + 1
+        b.clip_rect = self.clip_rect
+        b.clip_stack = []
+        idx: int = 0
+        while idx < len(self.clip_stack):
+            b.clip_stack.append(self.clip_stack[idx])
+            idx = idx + 1
         return b
 
     def resize(self: ScreenBuffer, new_w: int, new_h: int) -> None:

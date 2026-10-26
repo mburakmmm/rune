@@ -171,4 +171,21 @@ lay_sp.add_constraint(length_constraint(20))
 sp_res: list[Rect] = lay_sp.split(Rect(0, 0, 40, 10))
 nox.test.assert_true(sp_res[1].x + sp_res[1].width <= 40, "child rect never exceeds parent area boundary")
 
+# 8. Multiple Min Constraints Space Sharing
+lay_multi_min: Layout = Layout(DIRECTION_HORIZONTAL, 0, 0)
+lay_multi_min.add_constraint(min_constraint(10))
+lay_multi_min.add_constraint(min_constraint(20))
+multi_res: list[Rect] = lay_multi_min.split(Rect(0, 0, 60, 20))
+nox.test.assert_eq_int(multi_res[0].width, 25, "chunk 0 receives equal extra flexible share")
+nox.test.assert_eq_int(multi_res[1].width, 35, "chunk 1 receives equal extra flexible share")
+nox.test.assert_eq_int(multi_res[0].width + multi_res[1].width, 60, "total width equals available width")
+
+# 9. Min and Max Constraint Combined Behavior
+lay_min_max: Layout = Layout(DIRECTION_HORIZONTAL, 0, 0)
+lay_min_max.add_constraint(max_constraint(20))
+lay_min_max.add_constraint(min_constraint(15))
+mm_res: list[Rect] = lay_min_max.split(Rect(0, 0, 50, 20))
+nox.test.assert_eq_int(mm_res[0].width, 20, "max constraint capped at 20")
+nox.test.assert_eq_int(mm_res[1].width, 30, "min constraint absorbs remaining 30 width")
+
 print("tui_layout_test passed")

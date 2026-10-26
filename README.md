@@ -182,7 +182,7 @@ Options:
 | **CLI** | Subcommands | **Supported** | Arbitrary nesting (`git commit`) |
 | **CLI** | Shell Autocompletion | **Supported** | Native generator for Bash, Zsh, and Fish |
 | **CLI** | Standard Exit Codes | **Supported** | 0 (success/help), 2 (usage error), 1 (failure) |
-| **TUI** | Screen Buffer & Cells | **Supported** | 2D character matrix, wide char awareness, 2D clipping |
+| **TUI** | Screen Buffer & Cells | **Supported** | 2D character matrix, wide char awareness, 2D clip stack |
 | **TUI** | Double-Buffering Diff | **Supported** | Flicker-free minimal ANSI diff painter |
 | **TUI** | Alternate Screen Buffer | **Supported** | `\x1b[?1049h` / `\x1b[?1049l` with cleanup |
 | **TUI** | Cursor Control & Restoration | **Supported** | Hide/show, direct positioning, cleanup |
@@ -191,7 +191,7 @@ Options:
 | **TUI** | Declarative Widgets | **Supported** | Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar |
 | **TUI** | ANSI Key Sequence Decoder | **Supported** | Arrow keys, VT/xterm function keys, Ctrl/Alt/Shift modifiers |
 | **TUI** | Event Model & Loop | **Supported** | `KeyEvent`, `TickEvent`, `ResizeEvent`, monotonic frame loop |
-| **TUI** | Elm/Bubbletea Runtime | **Supported** | `TuiApp` lifecycle (`init`, `update`, `view`), `AppRunner` with event batching |
+| **TUI** | Elm/Bubbletea Runtime | **Supported** | `TuiApp` lifecycle (`init`, `update`, `view`), `AppRunner` with event batching & escape delays |
 
 ---
 

@@ -294,8 +294,20 @@ class KeyDecoder:
     def flush(self: KeyDecoder) -> list[KeyEvent]:
         res: list[KeyEvent] = []
         if len(self.buffer) > 0:
-            # Trailing isolated ESC
-            if self.buffer == chr(27) or self.buffer == "\x1b":
-                res.append(KeyEvent("esc"))
+            b: str = self.buffer
             self.buffer = ""
+            if b == chr(27) or b == "\x1b":
+                res.append(KeyEvent("esc"))
+            elif len(b) > 0 and ord(b[0]) == 27:
+                # Escape followed by leftover chars that timed out
+                res.append(KeyEvent("esc"))
+                k: int = 1
+                while k < len(b):
+                    res.append(KeyEvent(b[k]))
+                    k = k + 1
+            else:
+                k2: int = 0
+                while k2 < len(b):
+                    res.append(KeyEvent(b[k2]))
+                    k2 = k2 + 1
         return res

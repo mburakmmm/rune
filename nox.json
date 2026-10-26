@@ -1,6 +1,6 @@
 {
   "name": "rune",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "entry": "main.nox",
   "bin": { "name": "rune", "path": "main.nox" },
   "requires": []

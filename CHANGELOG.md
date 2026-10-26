@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.3] - 2026-10-26
+
+### Fixed & Hardened (GPT 5.6 Audit Hardening for Left-Clipping, Unicode Straddles, Clip Stacks, and Escape Delays)
+- **[P1] Left-Clipping Character Offset Alignment (`ScreenBuffer.write_string`)**:
+  - Fixed an offset bug where text starting to the left of the active `clip_rect` shifted its starting coordinate without skipping the preceding characters.
+  - Characters whose virtual column spans fall strictly before `clip_rect.x` are accurately skipped based on their display cell width (`char_width`).
+  - For string `"ABCDEFGHIJ"` starting at `x=0` with `clip_rect = Rect(5, y, 5, 1)`, columns 5..9 now display `"FGHIJ"` instead of shifted prefix `"ABCDE"`.
+- **[P1] Wide Character Boundary Straddling & Clipping Integrity (`ScreenBuffer.set`)**:
+  - Wide 2-cell Unicode characters (e.g. CJK `界`, emojis) now verify that BOTH cell `x` and continuation cell `x + 1` fall strictly within the active `clip_rect`.
+  - If a wide character straddles the right clipping boundary, `ScreenBuffer.set` writes a clean space `" "` at `x` and completely avoids writing into `x + 1`, eliminating boundary leaks into adjacent panes.
+  - If a wide character straddles the left clipping boundary in `write_string`, a blank space is placed at `clip_rect.x` to prevent orphaned half-glyphs.
+- **[P1] Nested Clip Stack Engine (`push_clip` / `pop_clip`)**:
+  - Added hierarchical 2D clipping support via `ScreenBuffer.push_clip(rect)` and `ScreenBuffer.pop_clip()`, mirrored on `Frame`.
+  - Pushed rectangles are automatically intersected with parent clipping regions, guaranteeing child widgets can never escape their parent containers.
+- **[P1] Deterministic Escape Delay Timing (`AppRunner.check_esc_timeout`)**:
+  - Isolated trailing `ESC` keys are no longer prematurely flushed on immediate `process_input_queue()` calls.
+  - Added configurable `esc_timeout_ms: int = 50` and elapsed time tracking. Trailing escape sequences split across chunks (e.g. `ESC` followed by `[A`) seamlessly complete without generating spurious standalone `ESC` events.
+  - Standalone `ESC` keys flush only after the 50ms escape delay expires or upon explicit flush.
+
+---
+
 ## [1.4.2] - 2026-10-26
 
 ### Added & Hardened (GPT 5.6 Audit Hardening for Event Batching, Global Clipping, and Robust Setup)

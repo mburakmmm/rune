@@ -210,4 +210,32 @@ malformed_dec: KeyDecoder = KeyDecoder()
 malformed_dec.feed(ESC + "[1234567890123456789012345678901234567890")
 nox.test.assert_true(len(malformed_dec.buffer) <= 32, "runaway CSI sequence does not exceed buffer cap")
 
+# 9. AppRunner Escape Delay Timing Test (GPT 5.6 Fragmented Stream Issue)
+delay_app: CounterApp = CounterApp()
+delay_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+delay_runner: AppRunner = AppRunner(delay_app, delay_driver, 50)
+delay_app.init()
+
+# 1. Queue standalone ESC
+delay_runner.queue_raw(ESC)
+# 2. Process input queue immediately (before timeout)
+delay_runner.process_input_queue()
+nox.test.assert_eq_int(len(delay_runner.input_queue), 0, "ESC retained in decoder buffer before timeout")
+nox.test.assert_eq_str(delay_runner.decoder.buffer, ESC, "buffer still holds ESC")
+
+# 3. Next chunk arrives: "[A" (Up arrow)
+delay_runner.queue_raw("[A")
+nox.test.assert_eq_int(len(delay_runner.input_queue), 1, "completed sequence queued as 1 event")
+nox.test.assert_eq_str(delay_runner.input_queue[0].key, "up", "completed sequence decoded as up arrow, not orphaned esc")
+delay_runner.process_input_queue()
+nox.test.assert_eq_int(delay_app.count, 11, "up arrow processed")
+
+# 4. Standalone ESC with tick timeout:
+delay_runner.queue_raw(ESC)
+delay_runner.check_esc_timeout(30)
+nox.test.assert_eq_int(len(delay_runner.input_queue), 0, "30ms tick does not exceed 50ms timeout")
+delay_runner.check_esc_timeout(30)
+nox.test.assert_eq_int(len(delay_runner.input_queue), 1, "timeout reached, standalone ESC emitted")
+nox.test.assert_eq_str(delay_runner.input_queue[0].key, "esc", "emitted key is esc")
+
 print("tui_app_test passed")

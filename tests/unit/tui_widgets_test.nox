@@ -195,10 +195,13 @@ nox.test.assert_eq_str(buf_clip.get(0, 0).char, " ", "cell outside clip_rect rem
 buf_clip.set(3, 2, "Y")
 nox.test.assert_eq_str(buf_clip.get(3, 2).char, "Y", "cell inside clip_rect is written")
 
-# Write string starting outside clip bound
+# Write string starting outside clip bound (0..7, clipped to 2..5)
 buf_clip.write_string(0, 2, "ABCDEFGH")
 nox.test.assert_eq_str(buf_clip.get(1, 2).char, " ", "prefix before clip_rect left bound untouched")
-nox.test.assert_eq_str(buf_clip.get(2, 2).char, "A", "first clipped character written at clip left")
+nox.test.assert_eq_str(buf_clip.get(2, 2).char, "C", "character offset correctly aligns at left clip bound")
+nox.test.assert_eq_str(buf_clip.get(3, 2).char, "D", "character D written at column 3")
+nox.test.assert_eq_str(buf_clip.get(4, 2).char, "E", "character E written at column 4")
+nox.test.assert_eq_str(buf_clip.get(5, 2).char, "F", "character F written at column 5")
 nox.test.assert_eq_str(buf_clip.get(6, 2).char, " ", "suffix after clip_rect right bound untouched")
 
 # Fill rect clipped
@@ -207,5 +210,48 @@ nox.test.assert_eq_str(buf_clip.get(0, 0).char, " ", "fill_rect clipped at top-l
 nox.test.assert_eq_str(buf_clip.get(2, 1).char, "#", "fill_rect fills inside clip_rect")
 
 buf_clip.set_clip(None)
+
+# 10. Left-Clipping Text Offset Exact Case (GPT 5.6 Test)
+buf_clip2: ScreenBuffer = ScreenBuffer(15, 3)
+buf_clip2.set_clip(Rect(5, 1, 5, 1))
+buf_clip2.write_string(0, 1, "ABCDEFGHIJ")
+nox.test.assert_eq_str(buf_clip2.get(4, 1).char, " ", "column 4 untouched")
+nox.test.assert_eq_str(buf_clip2.get(5, 1).char, "F", "column 5 is F")
+nox.test.assert_eq_str(buf_clip2.get(6, 1).char, "G", "column 6 is G")
+nox.test.assert_eq_str(buf_clip2.get(7, 1).char, "H", "column 7 is H")
+nox.test.assert_eq_str(buf_clip2.get(8, 1).char, "I", "column 8 is I")
+nox.test.assert_eq_str(buf_clip2.get(9, 1).char, "J", "column 9 is J")
+nox.test.assert_eq_str(buf_clip2.get(10, 1).char, " ", "column 10 untouched")
+
+# 11. Wide Character Clipping Integrity Tests
+buf_wide: ScreenBuffer = ScreenBuffer(10, 3)
+buf_wide.set_clip(Rect(0, 0, 5, 3))
+buf_wide.set(4, 0, "界")
+nox.test.assert_eq_str(buf_wide.get(4, 0).char, " ", "wide char right edge cannot leak continuation outside clip")
+nox.test.assert_eq_str(buf_wide.get(5, 0).char, " ", "column 5 outside clip rect remains untouched")
+
+buf_wide2: ScreenBuffer = ScreenBuffer(10, 3)
+buf_wide2.set_clip(Rect(2, 0, 5, 3))
+buf_wide2.write_string(0, 0, "A界B")
+nox.test.assert_eq_str(buf_wide2.get(2, 0).char, " ", "straddling wide char left half replaced with space at clip edge")
+nox.test.assert_eq_str(buf_wide2.get(3, 0).char, "B", "character inside clip window correctly placed at column 3")
+
+# 12. Clip Stack Tests (push_clip, pop_clip)
+buf_stack: ScreenBuffer = ScreenBuffer(20, 10)
+buf_stack.push_clip(Rect(2, 2, 10, 6))
+c1: Rect | None = buf_stack.get_clip()
+if c1 != None:
+    nox.test.assert_eq_int(c1.x, 2, "initial clip pushed x=2")
+buf_stack.push_clip(Rect(5, 3, 10, 6))
+c2: Rect | None = buf_stack.get_clip()
+if c2 != None:
+    nox.test.assert_eq_int(c2.x, 5, "nested clip intersected x is 5")
+    nox.test.assert_eq_int(c2.width, 7, "nested clip intersected width is 7")
+buf_stack.pop_clip()
+c3: Rect | None = buf_stack.get_clip()
+if c3 != None:
+    nox.test.assert_eq_int(c3.x, 2, "popped clip restored previous clip x=2")
+buf_stack.pop_clip()
+nox.test.assert_true(buf_stack.get_clip() == None, "popping all clips clears clip_rect")
 
 print("tui_widgets_test passed")
