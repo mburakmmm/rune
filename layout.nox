@@ -216,6 +216,8 @@ class Layout:
                 sz = available_size * c.val1 // c.val2
             elif c.kind == CONSTRAINT_MAX:
                 sz = c.val1
+                if sz > available_size:
+                    sz = available_size
             elif c.kind == CONSTRAINT_MIN:
                 sz = c.val1
                 flexible_indices.append(i)
@@ -238,7 +240,17 @@ class Layout:
                     sizes[target_idx] = sizes[target_idx] + bonus
                     f_idx = f_idx + 1
             else:
-                sizes[n - 1] = sizes[n - 1] + remaining
+                # Find an index that is allowed to expand (not fixed LENGTH or MAX cap)
+                expand_idx: int = -1
+                chk: int = n - 1
+                while chk >= 0:
+                    ck: int = self.constraints[chk].kind
+                    if ck != CONSTRAINT_LENGTH and ck != CONSTRAINT_MAX:
+                        expand_idx = chk
+                        break
+                    chk = chk - 1
+                if expand_idx >= 0:
+                    sizes[expand_idx] = sizes[expand_idx] + remaining
         elif remaining < 0:
             deficit: int = -remaining
             shrink_idx: int = n - 1
@@ -255,14 +267,21 @@ class Layout:
         # Step 3: convert sizes into Rect list
         res: list[Rect] = []
         cur_pos: int = 0
+        limit_pos: int = 0
         if self.direction == DIRECTION_VERTICAL:
             cur_pos = target_area.y
+            limit_pos = target_area.y + target_area.height
         else:
             cur_pos = target_area.x
+            limit_pos = target_area.x + target_area.width
 
         i = 0
         while i < n:
             chunk_sz: int = sizes[i]
+            if cur_pos + chunk_sz > limit_pos:
+                chunk_sz = limit_pos - cur_pos
+            if chunk_sz < 0:
+                chunk_sz = 0
             child_rect: Rect = Rect()
             if self.direction == DIRECTION_VERTICAL:
                 child_rect = Rect(target_area.x, cur_pos, target_area.width, chunk_sz)
@@ -270,6 +289,8 @@ class Layout:
                 child_rect = Rect(cur_pos, target_area.y, chunk_sz, target_area.height)
             res.append(child_rect)
             cur_pos = cur_pos + chunk_sz + self.spacing
+            if cur_pos > limit_pos:
+                cur_pos = limit_pos
             i = i + 1
 
         return res

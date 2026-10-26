@@ -55,12 +55,15 @@ class AppRunner:
     tick_rate_ms: int
     frame_count: int
     decoder: KeyDecoder
+    auto_clear: bool
+    input_queue: list[Event]
 
     def __init__(
         self: AppRunner,
         app: TuiApp,
         driver: TerminalDriver | None = None,
-        tick_rate_ms: int = 100
+        tick_rate_ms: int = 100,
+        auto_clear: bool = True
     ) -> None:
         self.app = app
         if driver != None:
@@ -72,12 +75,43 @@ class AppRunner:
         self.tick_rate_ms = tick_rate_ms
         self.frame_count = 0
         self.decoder = KeyDecoder()
+        self.auto_clear = auto_clear
+        self.input_queue = []
+
+    def queue_event(self: AppRunner, ev: Event) -> None:
+        self.input_queue.append(ev)
+
+    def queue_key(self: AppRunner, key: str, ctrl: bool = False, alt: bool = False, shift: bool = False) -> None:
+        self.input_queue.append(make_key_event(key, ctrl, alt, shift))
+
+    def queue_raw(self: AppRunner, raw: str) -> None:
+        keys: list[KeyEvent] = self.decoder.feed(raw)
+        idx: int = 0
+        while idx < len(keys):
+            k: KeyEvent = keys[idx]
+            self.input_queue.append(make_key_event(k.key, k.ctrl, k.alt, k.shift))
+            idx = idx + 1
+
+    def process_input_queue(self: AppRunner) -> None:
+        if len(self.input_queue) == 0:
+            return
+        pending: list[Event] = self.input_queue
+        self.input_queue = []
+        idx: int = 0
+        while idx < len(pending) and self.app.running:
+            ev: Event = pending[idx]
+            res: bool = self.step(ev)
+            if not res:
+                break
+            idx = idx + 1
 
     def step(self: AppRunner, event: Event) -> bool:
         keep: bool = self.app.update(event)
         if not keep:
             self.app.running = False
             return False
+        if self.auto_clear:
+            self.driver.current_buffer.clear()
         frame: Frame = Frame(self.driver.current_buffer)
         self.app.view(frame)
         self.driver.flush()
@@ -87,6 +121,8 @@ class AppRunner:
     def run_event_stream(self: AppRunner, event_list: list[Event]) -> int:
         self.app.init()
         # Initial render
+        if self.auto_clear:
+            self.driver.current_buffer.clear()
         frame: Frame = Frame(self.driver.current_buffer)
         self.app.view(frame)
         self.driver.flush()
@@ -106,23 +142,29 @@ class AppRunner:
         # 1. Setup terminal environment
         self.driver.enter_alt_screen()
         self.driver.hide_cursor()
-        self.app.init()
+        try:
+            self.app.init()
 
-        # Initial frame
-        frame: Frame = Frame(self.driver.current_buffer)
-        self.app.view(frame)
-        self.driver.flush()
-        self.frame_count = self.frame_count + 1
+            # Initial frame
+            if self.auto_clear:
+                self.driver.current_buffer.clear()
+            frame: Frame = Frame(self.driver.current_buffer)
+            self.app.view(frame)
+            self.driver.flush()
+            self.frame_count = self.frame_count + 1
 
-        # 2. Main loop
-        while self.app.running:
-            if max_frames >= 0 and self.frame_count >= max_frames:
-                break
-            # Tick sleep
-            nox.time.sleep_ms(self.tick_rate_ms)
-            step_res: bool = self.step(make_tick_event(self.tick_rate_ms))
-            if not step_res:
-                break
-
-        # 3. Always restore terminal state cleanly
-        self.driver.restore()
+            # 2. Main loop
+            while self.app.running:
+                if max_frames >= 0 and self.frame_count >= max_frames:
+                    break
+                self.process_input_queue()
+                if not self.app.running:
+                    break
+                # Tick sleep
+                nox.time.sleep_ms(self.tick_rate_ms)
+                step_res: bool = self.step(make_tick_event(self.tick_rate_ms))
+                if not step_res:
+                    break
+        finally:
+            # 3. Always restore terminal state cleanly, even on error or early break
+            self.driver.restore()

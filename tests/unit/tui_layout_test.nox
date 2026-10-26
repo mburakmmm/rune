@@ -157,4 +157,18 @@ nox.test.assert_eq_int(len(over_chunks), 2, "overallocated layout returns reques
 total_over_h: int = over_chunks[0].height + over_chunks[1].height
 nox.test.assert_eq_int(total_over_h, 20, "overallocated sum clamped to available dimension")
 
+# 6. Max Constraint Cap Safety
+lay_max: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+lay_max.add_constraint(length_constraint(10))
+lay_max.add_constraint(max_constraint(15))
+max_res: list[Rect] = lay_max.split(Rect(0, 0, 50, 40))
+nox.test.assert_eq_int(max_res[1].height, 15, "max constraint does not expand past cap of 15")
+
+# 7. Large Spacing Boundary Safety
+lay_sp: Layout = Layout(DIRECTION_HORIZONTAL, 0, 30)
+lay_sp.add_constraint(length_constraint(20))
+lay_sp.add_constraint(length_constraint(20))
+sp_res: list[Rect] = lay_sp.split(Rect(0, 0, 40, 10))
+nox.test.assert_true(sp_res[1].x + sp_res[1].width <= 40, "child rect never exceeds parent area boundary")
+
 print("tui_layout_test passed")

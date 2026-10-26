@@ -157,4 +157,38 @@ nox.test.assert_true(frames_run >= 4, "at least 4 frames rendered")
 buf_txt: str = mock_driver.current_buffer.to_text()
 nox.test.assert_eq_str(buf_txt[0:9], "Count: 11", "buffer snapshot contains final count")
 
+# 5. Stateful Fragmented Stream Decoding Tests
+stateful_dec: KeyDecoder = KeyDecoder()
+# First chunk: only ESC + "[" (incomplete CSI)
+f1: list[KeyEvent] = stateful_dec.feed(ESC + "[")
+nox.test.assert_eq_int(len(f1), 0, "incomplete CSI yields no keys immediately")
+nox.test.assert_eq_str(stateful_dec.buffer, ESC + "[", "buffer holds partial sequence")
+
+# Second chunk: "A" completes the Up Arrow sequence
+f2: list[KeyEvent] = stateful_dec.feed("A")
+nox.test.assert_eq_int(len(f2), 1, "completing chunk yields 1 key")
+nox.test.assert_eq_str(f2[0].key, "up", "decoded arrow up from fragmented chunks")
+nox.test.assert_eq_str(stateful_dec.buffer, "", "buffer emptied after sequence complete")
+
+# Trailing standalone ESC flushed on timeout/flush
+f3: list[KeyEvent] = stateful_dec.feed(ESC)
+nox.test.assert_eq_int(len(f3), 0, "trailing ESC held in buffer")
+flushed: list[KeyEvent] = stateful_dec.flush()
+nox.test.assert_eq_int(len(flushed), 1, "flush emits esc key")
+nox.test.assert_eq_str(flushed[0].key, "esc", "flushed key is esc")
+
+# 6. AppRunner Input Queue Tests
+q_app: CounterApp = CounterApp()
+q_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+q_runner: AppRunner = AppRunner(q_app, q_driver, 50)
+q_app.init()
+q_runner.queue_key("up")
+q_runner.queue_raw(ESC + "[B") # Down
+q_runner.queue_raw("q")
+
+nox.test.assert_eq_int(len(q_runner.input_queue), 3, "three queued events in runner")
+q_runner.process_input_queue()
+nox.test.assert_eq_int(len(q_runner.input_queue), 0, "input queue drained")
+nox.test.assert_true(not q_app.running, "q processed from queue terminated app")
+
 print("tui_app_test passed")

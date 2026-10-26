@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.1] - 2026-10-26
+
+### Fixed & Hardened (GPT 5.6 Audit Hardening for TUI Runtime & Widgets)
+- **[P0] Guaranteed Terminal State Restoration (`try ... finally`)**:
+  - `AppRunner.run_interactive()` is now wrapped in a strict `try ... finally: self.driver.restore()` block. Even in the event of an uncaught exception, runtime panic, or early loop break in application code, the terminal is guaranteed to restore normal screen buffers and reveal the cursor.
+- **[P0] Input Queue & Keyboard Buffering (`InputQueue`)**:
+  - Added `input_queue: list[Event]` to `AppRunner`.
+  - Added `queue_event()`, `queue_key()`, and `queue_raw()` methods to enqueue synthetic or streamed input.
+  - Added `process_input_queue()` which drains pending user/stream events before ticking.
+- **[P1] Stateful Fragmented Key Decoder (`KeyDecoder.feed`)**:
+  - `KeyDecoder` now buffers incoming partial byte streams. Fragmented escape sequences (e.g. `ESC [` followed in a later read by `A`) are retained in the buffer and completed across chunks without dropping or misinterpreting keystrokes. Added `flush()` to handle isolated trailing `ESC` keys.
+- **[P1] Frame Auto-Clearing (`auto_clear = True`)**:
+  - `AppRunner` now defaults to `auto_clear = True`, resetting `current_buffer` at the beginning of each frame. Diff rendering ensures only modified cells are transmitted to the terminal, eliminating ghost artifacts from previously rendered shorter text.
+- **[P1] Robust Widget Boundary Clipping**:
+  - `Block.render()` now strictly clamps the title width to `(area.x + area.width - 1) - t_x`, preventing oversized titles from overwriting the top-right corner character.
+  - `Paragraph.render()` now clips lines to `(area.x + area.width) - col`, preventing right-aligned and centered text from spilling past the bounding box.
+- **[P1] Layout Constraint Solver Bounds & Max Cap**:
+  - `CONSTRAINT_MAX` now clamps to `min(available_size, c.val1)` and does not expand past its cap when excess space is distributed.
+  - Spacing bounds ensure child rects never spill outside the parent `target_area`.
+
+---
+
 ## [1.4.0] - 2026-10-26
 
 ### Added (Phase 10: Event Loop & Interactive App Runner)

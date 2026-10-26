@@ -19,7 +19,6 @@ class KeyEvent:
         self.shift = shift
 
     def to_str(self: KeyEvent) -> str:
-
         res: str = ""
         if self.ctrl:
             res = res + "ctrl+"
@@ -31,7 +30,6 @@ class KeyEvent:
         return res
 
     def matches(self: KeyEvent, pattern: str) -> bool:
-
         pat: str = nox.strings.lower(pattern)
         if self.to_str() == pat:
             return True
@@ -63,7 +61,17 @@ class Event:
     width: int
     height: int
 
-    def __init__(self: Event, type: int, key: str = "", ctrl: bool = False, alt: bool = False, shift: bool = False, delta_ms: int = 0, width: int = 0, height: int = 0) -> None:
+    def __init__(
+        self: Event,
+        type: int,
+        key: str = "",
+        ctrl: bool = False,
+        alt: bool = False,
+        shift: bool = False,
+        delta_ms: int = 0,
+        width: int = 0,
+        height: int = 0
+    ) -> None:
         self.type = type
         self.key = key
         self.ctrl = ctrl
@@ -74,11 +82,9 @@ class Event:
         self.height = height
 
     def to_key_event(self: Event) -> KeyEvent:
-
         return KeyEvent(self.key, self.ctrl, self.alt, self.shift)
 
     def is_key(self: Event, expected: str = "") -> bool:
-
         if self.type != EVENT_KEY:
             return False
         if len(expected) == 0:
@@ -86,7 +92,6 @@ class Event:
         return self.to_key_event().matches(expected)
 
     def is_ctrl(self: Event, expected: str = "") -> bool:
-
         if self.type != EVENT_KEY or not self.ctrl:
             return False
         if len(expected) == 0:
@@ -94,15 +99,12 @@ class Event:
         return self.key == expected
 
     def is_tick(self: Event) -> bool:
-
         return self.type == EVENT_TICK
 
     def is_resize(self: Event) -> bool:
-
         return self.type == EVENT_RESIZE
 
     def key_str(self: Event) -> str:
-
         if self.type != EVENT_KEY:
             return ""
         return self.to_key_event().to_str()
@@ -117,11 +119,17 @@ def make_resize_event(width: int, height: int) -> Event:
     return Event(EVENT_RESIZE, "", False, False, False, 0, width, height)
 
 class KeyDecoder:
+    buffer: str
+
     def __init__(self: KeyDecoder) -> None:
-        pass
+        self.buffer = ""
 
-    def decode(self: KeyDecoder, raw: str) -> list[KeyEvent]:
+    def clear(self: KeyDecoder) -> None:
+        self.buffer = ""
 
+    def feed(self: KeyDecoder, chunk: str) -> list[KeyEvent]:
+        raw: str = self.buffer + chunk
+        self.buffer = ""
         decoded: list[KeyEvent] = []
         n: int = len(raw)
         i: int = 0
@@ -131,10 +139,10 @@ class KeyDecoder:
 
             # 1. Escape Sequences
             if b == 27:
+                # If ESC is at the very end of chunk, retain in buffer in case it's part of a sequence
                 if i + 1 >= n:
-                    decoded.append(KeyEvent("esc"))
-                    i = i + 1
-                    continue
+                    self.buffer = raw[i:]
+                    break
                 next_ch: str = raw[i + 1]
 
                 # CSI: \x1b[
@@ -221,12 +229,12 @@ class KeyDecoder:
                         i = j + 1
                         continue
                     else:
-                        decoded.append(KeyEvent("esc"))
-                        i = i + 1
-                        continue
-                elif next_ch == "O":
+                        # Incomplete CSI sequence, retain in buffer for next feed()
+                        self.buffer = raw[i:]
+                        break
 
-                    # SS3: \x1bO
+                # SS3: \x1bO
+                elif next_ch == "O":
                     if i + 2 < n:
                         fn: str = raw[i + 2]
                         if fn == "P":
@@ -240,18 +248,18 @@ class KeyDecoder:
                         i = i + 3
                         continue
                     else:
-                        decoded.append(KeyEvent("esc"))
-                        i = i + 1
-                        continue
-                else:
+                        # Incomplete SS3 sequence, retain in buffer
+                        self.buffer = raw[i:]
+                        break
 
-                    # Alt + character: \x1b<char>
+                # Alt + character: \x1b<char>
+                else:
                     decoded.append(KeyEvent(next_ch, False, True, False))
                     i = i + 2
                     continue
-            elif b == 9:
 
-                # 2. Control Characters
+            # 2. Control Characters
+            elif b == 9:
                 decoded.append(KeyEvent("tab"))
             elif b == 10 or b == 13:
                 decoded.append(KeyEvent("enter"))
@@ -260,11 +268,30 @@ class KeyDecoder:
             elif b >= 1 and b <= 26:
                 ctrl_key: str = chr(96 + b)
                 decoded.append(KeyEvent(ctrl_key, True, False, False))
-            else:
 
-                # 3. Standard Characters
+            # 3. Standard Characters
+            else:
                 decoded.append(KeyEvent(ch, False, False, False))
 
             i = i + 1
 
         return decoded
+
+    def decode(self: KeyDecoder, raw: str) -> list[KeyEvent]:
+        res: list[KeyEvent] = self.feed(raw)
+        if len(self.buffer) > 0:
+            flushed: list[KeyEvent] = self.flush()
+            idx: int = 0
+            while idx < len(flushed):
+                res.append(flushed[idx])
+                idx = idx + 1
+        return res
+
+    def flush(self: KeyDecoder) -> list[KeyEvent]:
+        res: list[KeyEvent] = []
+        if len(self.buffer) > 0:
+            # Trailing isolated ESC
+            if self.buffer == chr(27) or self.buffer == "\x1b":
+                res.append(KeyEvent("esc"))
+            self.buffer = ""
+        return res

@@ -35,6 +35,13 @@ nox.test.assert_eq_str(buf.get(2, 0).char, " ", "title padding")
 nox.test.assert_eq_str(buf.get(3, 0).char, "S", "title char S")
 nox.test.assert_eq_str(buf.get(4, 0).char, "t", "title char t")
 
+# Title clipping check: long title must NOT overwrite top-right corner
+buf.clear()
+blk_long: Block = Block("A Very Very Long Long Title Indeed", "left", "rounded")
+blk_long.render(Rect(0, 0, 12, 4), buf)
+nox.test.assert_eq_str(buf.get(11, 0).char, "╮", "top-right corner preserved despite oversized title")
+nox.test.assert_eq_str(buf.get(0, 0).char, "╭", "top-left corner preserved")
+
 # Square border type
 buf.clear()
 blk_sq: Block = Block("", "left", "square")
@@ -76,13 +83,12 @@ nox.test.assert_eq_str(buf.get(0, 0).char, "T", "first line starts with T")
 # 2nd line must exist
 nox.test.assert_true(buf.get(0, 1).char != " ", "second line contains wrapped text")
 
-# Paragraph scroll offset
+# Paragraph right-alignment clipping check
 buf.clear()
-p_scroll: Paragraph = Paragraph("Line 1\nLine 2\nLine 3", None, False, 1, "left")
-p_scroll.render(Rect(0, 0, 20, 3), buf)
-# Row 0 should render Line 2 because scroll = 1
-nox.test.assert_eq_str(buf.get(0, 0).char, "L", "first displayed line is Line 2")
-nox.test.assert_eq_str(buf.get(5, 0).char, "2", "line 2 indicator")
+p_right: Paragraph = Paragraph("LongRightAlignedText", None, False, 0, "right")
+p_right.render(Rect(5, 0, 10, 2), buf)
+# Characters must NOT spill past col 14 (5 + 10 - 1)
+nox.test.assert_eq_str(buf.get(15, 0).char, " ", "paragraph text clipped at rect boundary")
 
 # 3. Gauge Widget Tests
 buf.clear()

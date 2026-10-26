@@ -106,7 +106,9 @@ class Block:
                 t_x = area.x + area.width - t_len - 2
             if t_x < area.x + 1:
                 t_x = area.x + 1
-            buf.write_string(t_x, area.y, t_str, self.title_style, area.width - 2)
+            max_title_w: int = area.x + area.width - 1 - t_x
+            if max_title_w > 0:
+                buf.write_string(t_x, area.y, t_str, self.title_style, max_title_w)
 
 class Paragraph:
     text: str
@@ -149,7 +151,9 @@ class Paragraph:
                 col = area.x + area.width - lw
             if col < area.x:
                 col = area.x
-            buf.write_string(col, row, line_str, self.style, area.width)
+            rem_w: int = area.x + area.width - col
+            if rem_w > 0:
+                buf.write_string(col, row, line_str, self.style, rem_w)
             row = row + 1
             line_idx = line_idx + 1
 
