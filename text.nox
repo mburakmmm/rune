@@ -1,0 +1,54 @@
+# text.nox — Rich text composition with inline spans and styling.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions, cell_width, strip_ansi
+
+class Span:
+    content: str
+    style: Style
+
+    def __init__(self: Span, content: str, style: Style | None = None) -> None:
+        self.content = content
+        if style is not None:
+            self.style = style
+        else:
+            self.style = Style()
+
+class Text:
+    spans: list[Span]
+
+    def __init__(self: Text, initial: str = "", style: Style | None = None) -> None:
+        self.spans = []
+        if len(initial) > 0:
+            self.spans.append(Span(initial, style))
+
+    def append(self: Text, content: str, style: Style | None = None) -> Text:
+        self.spans.append(Span(content, style))
+        return self
+
+    def plain_text(self: Text) -> str:
+        parts: list[str] = []
+        i: int = 0
+        while i < len(self.spans):
+            parts.append(self.spans[i].content)
+            i = i + 1
+        return nox.strings.join(parts, "")
+
+    def cell_width(self: Text) -> int:
+        return cell_width(self.plain_text())
+
+    def render(self: Text, options: ConsoleOptions) -> str:
+        if not options.supports_color:
+            return strip_ansi(self.plain_text())
+
+        parts: list[str] = []
+        i: int = 0
+        while i < len(self.spans):
+            sp: Span = self.spans[i]
+            if sp.style.is_plain():
+                parts.append(sp.content)
+            else:
+                parts.append(sp.style.apply(sp.content))
+            i = i + 1
+        return nox.strings.join(parts, "")

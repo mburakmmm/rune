@@ -1,0 +1,37 @@
+# tests/unit/table_multiline_test.nox — Tests for Table multiline and wrapped cell rendering.
+
+import nox.test
+import core
+from core import ConsoleOptions
+import table
+from table import Table
+
+opts: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+
+# 1. Table with explicit newline multiline cells
+tbl: Table = Table("Packages", "rounded")
+tbl.add_column("Package", "left")
+tbl.add_column("Description", "left")
+
+tbl.add_row(["Rune", "Rich terminal styling\nClick/Typer CLI framework\nDependency-free"])
+tbl.add_row(["Nova", "HTTP client"])
+
+out: str = tbl.render(opts)
+
+nox.test.assert_true("Rich terminal styling" in out, "First line of multiline cell present")
+nox.test.assert_true("Click/Typer CLI framework" in out, "Second line of multiline cell present")
+nox.test.assert_true("Dependency-free" in out, "Third line of multiline cell present")
+nox.test.assert_true("HTTP client" in out, "Single-line cell on second row present")
+
+# 2. Table with max_width column wrapping
+tbl2: Table = Table("Wrapped", "rounded")
+tbl2.add_column("ID", "right")
+# Column with max_width 15 to force text wrapping
+tbl2.add_column("Details", "left", None, 15)
+
+tbl2.add_row(["1", "The quick brown fox jumps over the lazy dog"])
+out2: str = tbl2.render(opts)
+
+nox.test.assert_true("The quick brown" in out2, "Details text should be wrapped within max_width")
+
+print("table_multiline_test passed")

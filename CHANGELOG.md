@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-10-26
+
+### Added
+- **Text & Span Composition (`rune.text`)**:
+  - `Span` model associating styled text segments.
+  - `Text` container supporting fluent chaining (`append()`), multi-span rendering, and accurate visible cell width calculation.
+- **Extended Color Palettes (`rune.core`)**:
+  - ANSI 256-color support (`color_256`, `bg_256`).
+  - 24-bit Truecolor RGB support (`color_rgb`, `bg_rgb`).
+  - Hex color code resolution (`#RRGGBB` via `hex_to_rgb` and `hex_to_bg_rgb`).
+- **Layout & Wrapping Utilities (`rune.core`)**:
+  - `wrap_text(s, max_width)`: word-aware paragraph wrapping with hard splitting of oversized words.
+  - `truncate(s, max_width, ellipsis)`: width-aware string truncation with customizable ellipsis.
+  - Dynamic terminal dimension discovery from `COLUMNS` and `LINES` environment variables.
+- **Table Multiline & Wrapped Rendering (`rune.table`)**:
+  - Multiline cell support (`\n` in cell values).
+  - Configurable `Column.max_width`: wraps cell contents automatically to fit constrained column widths.
+  - Vertical border continuity across multiline sub-rows.
+- **Test Suites**:
+  - `tests/unit/text_test.nox`
+  - `tests/unit/core_color_wrap_test.nox`
+  - `tests/unit/table_multiline_test.nox`
+
+---
+
 ## [0.1.0] - 2026-10-26
 
 ### Added

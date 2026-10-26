@@ -1,0 +1,43 @@
+# tests/unit/core_color_wrap_test.nox — Tests for 256-color, RGB truecolor, hex, truncate, and wrap_text.
+
+import nox.test
+import core
+from core import Style, color_256, bg_256, color_rgb, bg_rgb, hex_to_rgb, truncate, wrap_text, esc_code
+
+# 1. 256 colors & Truecolor formatting
+c256: str = color_256(196)
+nox.test.assert_eq_str(c256, "38;5;196", "color_256 generates correct ANSI parameter")
+
+crgb: str = color_rgb(255, 128, 0)
+nox.test.assert_eq_str(crgb, "38;2;255;128;0", "color_rgb generates 24-bit Truecolor sequence")
+
+# 2. Hex color resolution
+hex_res: str = hex_to_rgb("#FF0000")
+nox.test.assert_eq_str(hex_res, "38;2;255;0;0", "hex_to_rgb converts #FF0000 to RGB red")
+
+hex_style: Style = Style("#00FF88")
+applied_hex: str = hex_style.apply("Text")
+nox.test.assert_true("38;2;0;255;136" in applied_hex, "Style applies hex color via truecolor SGR")
+
+# 3. Truncate
+short_str: str = truncate("hello", 10)
+nox.test.assert_eq_str(short_str, "hello", "Text shorter than max_width unchanged")
+
+long_str: str = truncate("supercalifragilistic", 10, "...")
+nox.test.assert_eq_str(long_str, "superca...", "Text truncated with ellipsis at exact max_width")
+nox.test.assert_eq_int(len(long_str), 10, "Truncated length equals max_width")
+
+# 4. Wrap text
+wrapped: list[str] = wrap_text("quick brown fox jumps over lazy dog", 12)
+nox.test.assert_true(len(wrapped) > 1, "Long text must wrap into multiple lines")
+w_idx: int = 0
+while w_idx < len(wrapped):
+    nox.test.assert_true(len(wrapped[w_idx]) <= 12, "Wrapped line length must be <= max_width")
+    w_idx = w_idx + 1
+
+# Long word breaking
+long_word_wrap: list[str] = wrap_text("1234567890abcdef", 5)
+nox.test.assert_eq_int(len(long_word_wrap), 4, "16 chars wrapped by 5 must produce 4 lines")
+nox.test.assert_eq_str(long_word_wrap[0], "12345", "First chunk matches")
+
+print("core_color_wrap_test passed")

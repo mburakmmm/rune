@@ -40,8 +40,56 @@ BG_MAGENTA: str = "45"
 BG_CYAN: str = "46"
 BG_WHITE: str = "47"
 
+def color_256(n: int) -> str:
+    return "38;5;" + str(n)
+
+def bg_256(n: int) -> str:
+    return "48;5;" + str(n)
+
+def color_rgb(r: int, g: int, b: int) -> str:
+    return "38;2;" + str(r) + ";" + str(g) + ";" + str(b)
+
+def bg_rgb(r: int, g: int, b: int) -> str:
+    return "48;2;" + str(r) + ";" + str(g) + ";" + str(b)
+
+def _hex_digit(ch: str) -> int:
+    b: int = nox.strings.byte_at(ch, 0)
+    if b >= 48 and b <= 57:
+        return b - 48
+    if b >= 65 and b <= 70:
+        return b - 55
+    if b >= 97 and b <= 102:
+        return b - 87
+    return 0
+
+def hex_to_rgb(hex_str: str) -> str:
+    s: str = nox.strings.trim(hex_str)
+    if nox.strings.starts_with(s, "#"):
+        s = s[1:]
+    if len(s) == 6:
+        r: int = _hex_digit(s[0]) * 16 + _hex_digit(s[1])
+        g: int = _hex_digit(s[2]) * 16 + _hex_digit(s[3])
+        b: int = _hex_digit(s[4]) * 16 + _hex_digit(s[5])
+        return color_rgb(r, g, b)
+    return ""
+
+def hex_to_bg_rgb(hex_str: str) -> str:
+    s: str = nox.strings.trim(hex_str)
+    if nox.strings.starts_with(s, "#"):
+        s = s[1:]
+    if len(s) == 6:
+        r: int = _hex_digit(s[0]) * 16 + _hex_digit(s[1])
+        g: int = _hex_digit(s[2]) * 16 + _hex_digit(s[3])
+        b: int = _hex_digit(s[4]) * 16 + _hex_digit(s[5])
+        return bg_rgb(r, g, b)
+    return ""
+
 def resolve_color_code(name: str) -> str:
     clean: str = nox.strings.lower(nox.strings.trim(name))
+    if nox.strings.starts_with(clean, "#"):
+        return hex_to_rgb(clean)
+    if nox.strings.contains(clean, ";"):
+        return clean
     if clean == "black":
         return COLOR_BLACK
     if clean == "red":
@@ -78,6 +126,10 @@ def resolve_color_code(name: str) -> str:
 
 def resolve_bg_code(name: str) -> str:
     clean: str = nox.strings.lower(nox.strings.trim(name))
+    if nox.strings.starts_with(clean, "#"):
+        return hex_to_bg_rgb(clean)
+    if nox.strings.contains(clean, ";"):
+        return clean
     if clean == "black":
         return BG_BLACK
     if clean == "red":
@@ -250,6 +302,84 @@ def cell_width(s: str) -> int:
     clean: str = strip_ansi(s)
     return len(clean)
 
+def truncate(s: str, max_width: int, ellipsis: str = "...") -> str:
+    cw: int = cell_width(s)
+    if cw <= max_width:
+        return s
+    ew: int = cell_width(ellipsis)
+    if max_width <= ew:
+        return s[:max_width]
+    target: int = max_width - ew
+    clean: str = strip_ansi(s)
+    if target < 0:
+        target = 0
+    return clean[:target] + ellipsis
+
+def wrap_text(s: str, max_width: int) -> list[str]:
+    lines: list[str] = []
+    if max_width <= 0:
+        lines.append(s)
+        return lines
+
+    raw_paragraphs: list[str] = nox.strings.split(s, "\n")
+    p_idx: int = 0
+    while p_idx < len(raw_paragraphs):
+        para: str = raw_paragraphs[p_idx]
+        if len(para) == 0:
+            lines.append("")
+            p_idx = p_idx + 1
+            continue
+
+        words: list[str] = nox.strings.split(para, " ")
+        cur_line: str = ""
+        w_idx: int = 0
+        while w_idx < len(words):
+            word: str = words[w_idx]
+            w_len: int = cell_width(word)
+
+            if len(cur_line) == 0:
+                if w_len > max_width:
+                    chunk_start: int = 0
+                    while chunk_start < len(word):
+                        chunk_end: int = chunk_start + max_width
+                        if chunk_end > len(word):
+                            chunk_end = len(word)
+                        chunk: str = word[chunk_start:chunk_end]
+                        if len(chunk) == max_width:
+                            lines.append(chunk)
+                        else:
+                            cur_line = chunk
+                        chunk_start = chunk_start + max_width
+                else:
+                    cur_line = word
+            else:
+                if cell_width(cur_line) + 1 + w_len <= max_width:
+                    cur_line = cur_line + " " + word
+                else:
+                    lines.append(cur_line)
+                    if w_len > max_width:
+                        chunk_start2: int = 0
+                        cur_line = ""
+                        while chunk_start2 < len(word):
+                            chunk_end2: int = chunk_start2 + max_width
+                            if chunk_end2 > len(word):
+                                chunk_end2 = len(word)
+                            chunk2: str = word[chunk_start2:chunk_end2]
+                            if len(chunk2) == max_width:
+                                lines.append(chunk2)
+                            else:
+                                cur_line = chunk2
+                            chunk_start2 = chunk_start2 + max_width
+                    else:
+                        cur_line = word
+            w_idx = w_idx + 1
+
+        if len(cur_line) > 0:
+            lines.append(cur_line)
+        p_idx = p_idx + 1
+
+    return lines
+
 def get_env_safe(key: str) -> str | None:
     try:
         val: str = nox.os.getenv(key)
@@ -298,8 +428,27 @@ def detect_console_options() -> ConsoleOptions:
     if ci is not None:
         is_tty = False
 
-    # Default conservative width: 80 cols
-    return ConsoleOptions(supports_color, True, 80, 24, is_tty, False)
+    term_width: int = 80
+    cols_env: str | None = get_env_safe("COLUMNS")
+    if cols_env is not None:
+        try:
+            cw_val: int = int(nox.strings.trim(cols_env))
+            if cw_val > 0:
+                term_width = cw_val
+        except ValueError:
+            pass
+
+    term_height: int = 24
+    lines_env: str | None = get_env_safe("LINES")
+    if lines_env is not None:
+        try:
+            ch_val: int = int(nox.strings.trim(lines_env))
+            if ch_val > 0:
+                term_height = ch_val
+        except ValueError:
+            pass
+
+    return ConsoleOptions(supports_color, True, term_width, term_height, is_tty, False)
 
 class Console:
     options: ConsoleOptions

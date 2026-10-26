@@ -1,7 +1,10 @@
 # rune.nox — Top-level unified facade for Rune (Rich + Click + Typer for Nox).
 
 import core
-from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, esc_code, reset_code
+from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, esc_code, reset_code, color_256, bg_256, color_rgb, bg_rgb, truncate, wrap_text
+
+import text
+from text import Text, Span
 
 import rule
 from rule import Rule

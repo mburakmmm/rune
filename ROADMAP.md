@@ -14,8 +14,8 @@
 | **Phase 3: CLI Framework MVP** | `v0.1.0` | Declarative args, options, subcommands, help, exit codes | **Completed** | `cli_test` |
 | **Phase 4: Prompts MVP** | `v0.1.0` | Text prompt, Confirm, Choice selection, CI safety | **Completed** | `prompt_test` |
 | **Integration & Release 0.1** | `v0.1.0` | Facade, showcase, examples, docs, publish to index | **Completed** | `integration_test` (6/6 passing) |
-| **Phase 1.5: Advanced Render** | `v0.2.0` | Multiline table wrapping, 256/RGB colors, `Text`/`Span` | **Next Up** | Pending |
-| **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Planned** | Pending |
+| **Phase 1.5: Advanced Render** | `v0.2.0` | Multiline table wrapping, 256/RGB colors, `Text`/`Span` | **Completed** | `text_test`, `core_color_wrap_test`, `table_multiline_test` |
+| **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Next Up** | Pending |
 | **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Planned** | Pending |
 | **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Planned** | Pending |
 | **Phase 5: Terminal Markdown & DX** | `v0.6.0` | Basic terminal Markdown parser, syntax highlighter | **Planned** | Pending |
@@ -78,24 +78,24 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ## 3. Detailed Version Roadmap
 
-### 📦 v0.2.0 — Advanced Rendering & Rich Layout
+### 📦 v0.2.0 — Advanced Rendering & Rich Layout (Completed)
 **Goal:** Enhance table layout and inline styling ergonomics to match advanced Rich formatting.
 
-- [ ] **Multiline Cell Wrapping in `Table`**:
+- [x] **Multiline Cell Wrapping in `Table`**:
   - Automatically wrap cell text exceeding column width across multiple lines.
   - Maintain border continuity across multiline rows.
-- [ ] **`Text` & `Span` Model**:
-  - Support rich text with inline styled segments (e.g. `text.append("Error: ", Style("red")).append("file not found")`).
+- [x] **`Text` & `Span` Model**:
+  - Support rich text with inline styled segments (`Text.append("Error: ", Style("red")).append("file not found")`).
   - Calculate combined visible width accurately.
-- [ ] **256-Color & RGB Truecolor Support**:
+- [x] **256-Color & RGB Truecolor Support**:
   - Add ANSI 256-color codes (`38;5;n` / `48;5;n`).
   - Add 24-bit RGB Truecolor SGR formatting (`38;2;r;g;b`).
-  - Graceful downgrade to 16 ANSI colors when truecolor is unsupported.
-- [ ] **Terminal Width Discovery**:
-  - Probe environment variables `COLUMNS` and `LINES` if available before falling back to 80x24.
-- [ ] **Text Truncation & Overflow Helpers**:
+  - Hex color parsing (`#RRGGBB` via `hex_to_rgb`).
+- [x] **Terminal Width Discovery**:
+  - Probe environment variables `COLUMNS` and `LINES` before falling back to 80x24.
+- [x] **Text Truncation & Overflow Helpers**:
   - Implement `truncate(s: str, max_width: int, ellipsis: str = "...")`.
-  - Column overflow strategies: `ELLIPSIS`, `CLIP`, `WRAP`.
+  - Implement `wrap_text(s: str, max_width: int) -> list[str]`.
 
 ---
 

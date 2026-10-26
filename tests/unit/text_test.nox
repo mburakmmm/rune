@@ -1,0 +1,30 @@
+# tests/unit/text_test.nox — Unit tests for Text and Span composition.
+
+import nox.test
+import core
+from core import Style, ConsoleOptions, esc_code, strip_ansi
+import text
+from text import Text, Span
+
+opts_color: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, True)
+opts_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+
+# 1. Text initialization & chaining
+t: Text = Text("Hello ", Style("green", "", True))
+t.append("beautiful ", Style("cyan"))
+t.append("Nox!", Style("bright_yellow", "", False, False, False, True))
+
+nox.test.assert_eq_str(t.plain_text(), "Hello beautiful Nox!", "plain_text must join span contents without styles")
+nox.test.assert_eq_int(t.cell_width(), 20, "cell_width must match combined plain length")
+
+# 2. Render in colored mode
+rendered_colored: str = t.render(opts_color)
+nox.test.assert_true(esc_code() in rendered_colored, "Colored render must contain ANSI escape codes")
+nox.test.assert_eq_str(strip_ansi(rendered_colored), "Hello beautiful Nox!", "strip_ansi must recover plain text")
+
+# 3. Render in plain mode (non-color)
+rendered_plain: str = t.render(opts_plain)
+nox.test.assert_true(esc_code() not in rendered_plain, "Plain render must not contain ANSI escape codes")
+nox.test.assert_eq_str(rendered_plain, "Hello beautiful Nox!", "Plain render must preserve exact content")
+
+print("text_test passed")
