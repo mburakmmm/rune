@@ -51,9 +51,7 @@ def prompt_int(
     if not con.options.is_tty:
         if default_val is not None:
             return default_val
-        if min_val is not None:
-            return min_val
-        return 0
+        raise NonInteractiveError("Prompt '" + question + "' required input in non-interactive environment without default")
 
     attempt: int = 0
     while attempt < max_retries:
@@ -132,7 +130,7 @@ def select_choice(
     if not con.options.is_tty:
         if len(default_val) > 0:
             return default_val
-        return choices[0]
+        raise NonInteractiveError("Select choice '" + question + "' required selection in non-interactive environment without default")
 
     con.print(question)
     i: int = 0
@@ -187,8 +185,7 @@ def select_multiple(
     if not con.options.is_tty:
         if default_choices is not None:
             return default_choices
-        first_only: list[str] = [choices[0]]
-        return first_only
+        raise NonInteractiveError("Select multiple '" + question + "' required selection in non-interactive environment without default")
 
     con.print(question)
     i: int = 0

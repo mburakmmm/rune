@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-10-26
+
+### Security & Hardening Fixes
+- **ANSI Sanitization & Line Spoofing Protection (P0)**:
+  - `sanitize_ansi()` now drops standalone `\r` (carriage return) characters to prevent terminal line overwrite and status spoofing; `\r\n` sequences are safely normalized to `\n`.
+  - Added stripping of C1 control codes (code points 128 through 159) to prevent 8-bit terminal control injections.
+  - Refactored `strip_ansi()` and `sanitize_ansi()` from byte indexing to Unicode scalar `ord(s[i])` indexing.
+- **Unicode Terminal Display Cell Width (P1)**:
+  - `char_width()` and `cell_width()` now accurately compute display cell counts matching standard terminal behaviour:
+    - CJK Unified Ideographs, Hangul, Fullwidth punctuation, and Katakana/Hiragana return width 2 (`界`, `你`, `好`).
+    - Standard emojis, pictographs, and symbols return width 2 (`🙂`, `🦀`, `☀️`).
+    - Combining diacritical marks (U+0300..U+036F), zero-width joiners (ZWJ), non-joiners (ZWNJ), and variation selectors return width 0.
+    - Standard Latin, numbers, and basic symbols return width 1 (`A`, `é`).
+  - `truncate()` and `wrap_text()` updated to respect display cell widths instead of naive code point counts.
+- **Consistent Non-Interactive Prompt Behavior (P1)**:
+  - `prompt_int()` now strictly raises `NonInteractiveError` when invoked in non-interactive/CI environments without an explicit default value (preventing silent 0 or min_val fallback).
+  - `select_choice()` and `select_multiple()` now strictly raise `NonInteractiveError` in non-interactive/CI environments when required selections lack explicit defaults.
+- **Color Validation & SGR Safety (P1)**:
+  - `color_rgb()`, `bg_rgb()`, `color_256()`, and `bg_256()` clamp integer components to `0..255`.
+  - `hex_to_rgb()` and `hex_to_bg_rgb()` strictly validate all 6 hex digits, rejecting invalid strings instead of falling back to 0.
+  - Semicolon-separated custom SGR parameters in `resolve_color_code()` are checked against `_is_safe_sgr_params()` to prevent escape sequence parameter injection.
+- **Progress Task Boundary Enforcement (P1)**:
+  - `Task.update()` and `Task.advance()` clamp completed values to `>= 0`.
+  - `Task.percentage()` clamps percentage between 0% and 100%.
+- **Documentation Parity (P2)**:
+  - Synchronized the executive dashboard table at the top of `ROADMAP.md` to reflect all completed milestones.
+- **Test Suites**:
+  - Added `tests/unit/security_hardening_test.nox` (18 passing test suites total).
+
+---
+
 ## [1.0.0] - 2026-10-26
 
 ### Production Release — 1.0.0 General Availability

@@ -1,0 +1,91 @@
+# tests/unit/security_hardening_test.nox — Tests for ANSI, Unicode, Color, and Prompt security hardening.
+
+import nox.test
+import nox.strings
+import core
+from core import ConsoleOptions, sanitize_ansi, strip_ansi, cell_width, color_rgb, bg_rgb, hex_to_rgb, resolve_color_code, esc_code
+import prompt
+from prompt import prompt_int, select_choice, select_multiple, NonInteractiveError
+import progress
+from progress import Task
+
+# 1. ANSI Sanitization: \r carriage return line spoofing protection
+spoofed: str = "Status: OK\rStatus: PWNED"
+sanitized_spoofed: str = sanitize_ansi(spoofed)
+nox.test.assert_true(not nox.strings.contains(sanitized_spoofed, "\r"), "Standalone \\r must be stripped to prevent terminal line overwrite")
+
+crlf_input: str = "line1\r\nline2"
+sanitized_crlf: str = sanitize_ansi(crlf_input)
+nox.test.assert_eq_str(sanitized_crlf, "line1\nline2", "\\r\\n must be normalized to \\n")
+
+# 2. ANSI Sanitization: C1 control characters (128-159)
+c1_char: str = nox.strings.char_from_byte(155) # 0x9B (C1 CSI)
+c1_input: str = "Safe" + c1_char + "Text"
+sanitized_c1: str = sanitize_ansi(c1_input)
+nox.test.assert_eq_str(sanitized_c1, "SafeText", "C1 control codes must be stripped")
+
+# 3. Unicode Display Cell Width (wcwidth equivalence)
+nox.test.assert_eq_int(cell_width("A"), 1, "ASCII 'A' must have cell_width 1")
+nox.test.assert_eq_int(cell_width("é"), 1, "Accented 'é' must have cell_width 1")
+nox.test.assert_eq_int(cell_width("界"), 2, "CJK '界' must have cell_width 2")
+nox.test.assert_eq_int(cell_width("🙂"), 2, "Emoji '🙂' must have cell_width 2")
+nox.test.assert_eq_int(cell_width("hello"), 5, "Word 'hello' must have cell_width 5")
+nox.test.assert_eq_int(cell_width("你好"), 4, "CJK '你好' must have cell_width 4")
+
+# Combining diacritical mark (width 0)
+combining_acute: str = nox.strings.char_from_byte(204) + nox.strings.char_from_byte(129) # U+0301
+nox.test.assert_eq_int(cell_width("e" + combining_acute), 1, "Combining mark on 'e' must have total width 1")
+
+# 4. Color RGB & Hex validation
+clamped_rgb: str = color_rgb(-10, 500, 120)
+nox.test.assert_eq_str(clamped_rgb, "38;2;0;255;120", "RGB values must be clamped between 0 and 255")
+
+valid_hex: str = hex_to_rgb("#FF0080")
+nox.test.assert_eq_str(valid_hex, "38;2;255;0;128", "Valid hex color must convert correctly")
+
+invalid_hex: str = hex_to_rgb("#GGZZ11")
+nox.test.assert_eq_str(invalid_hex, "", "Invalid hex digits must be rejected and return empty string")
+
+malicious_sgr: str = resolve_color_code("1;2;3m\x1b[2J")
+nox.test.assert_eq_str(malicious_sgr, "", "Unsafe SGR parameters must be rejected")
+
+# 5. Non-Interactive Prompt consistency
+opts_ci: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True) # is_tty = False
+con_ci: core.Console = core.Console(opts_ci)
+
+# prompt_int without default must raise NonInteractiveError
+prompt_int_failed: bool = False
+try:
+    prompt_int("How many files?", None, 0, 10, 3, con_ci)
+except NonInteractiveError:
+    prompt_int_failed = True
+nox.test.assert_true(prompt_int_failed, "prompt_int without default in CI must raise NonInteractiveError")
+
+# select_choice without default must raise NonInteractiveError
+select_choice_failed: bool = False
+try:
+    select_choice("Delete action?", ["cancel", "delete"], "", con_ci)
+except NonInteractiveError:
+    select_choice_failed = True
+nox.test.assert_true(select_choice_failed, "select_choice without default in CI must raise NonInteractiveError")
+
+# select_multiple without default must raise NonInteractiveError
+select_multiple_failed: bool = False
+try:
+    select_multiple("Select services", ["auth", "db"], None, con_ci)
+except NonInteractiveError:
+    select_multiple_failed = True
+nox.test.assert_true(select_multiple_failed, "select_multiple without default in CI must raise NonInteractiveError")
+
+# 6. Progress Task Boundaries
+t: Task = Task("Download", 100)
+t.update(-25)
+nox.test.assert_eq_int(t.completed, 0, "Negative completed must clamp to 0")
+nox.test.assert_eq_int(t.percentage(), 0, "Percentage must clamp to >= 0")
+
+t.update(150)
+nox.test.assert_eq_int(t.completed, 100, "Completed over total must cap at total")
+nox.test.assert_eq_int(t.percentage(), 100, "Percentage must cap at 100")
+nox.test.assert_true(t.finished, "Task must mark finished when total reached")
+
+print("security_hardening_test passed")

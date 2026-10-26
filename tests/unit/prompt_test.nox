@@ -31,13 +31,17 @@ nox.test.assert_true(c_true, "confirm must return True default in non-interactiv
 c_false: bool = confirm("Overwrite?", False, ci_con)
 nox.test.assert_true(not c_false, "confirm must return False default in non-interactive mode")
 
-# 4. Non-interactive select returns default or first choice
+# 4. Non-interactive select returns default or raises NonInteractiveError
 choices: list[str] = ["apple", "banana", "cherry"]
 sel1: str = select_choice("Pick fruit", choices, "banana", ci_con)
 nox.test.assert_eq_str(sel1, "banana", "select_choice must return specified default")
 
-sel2: str = select_choice("Pick fruit", choices, "", ci_con)
-nox.test.assert_eq_str(sel2, "apple", "select_choice without default must return first choice")
+sel_err: bool = False
+try:
+    select_choice("Pick fruit", choices, "", ci_con)
+except NonInteractiveError:
+    sel_err = True
+nox.test.assert_true(sel_err, "select_choice without default must raise NonInteractiveError in CI")
 
 # 5. prompt_password must raise PromptError
 pw_caught: bool = False

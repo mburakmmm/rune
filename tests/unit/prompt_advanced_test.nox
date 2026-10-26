@@ -4,20 +4,29 @@ import nox.test
 import core
 from core import Console, ConsoleOptions
 import prompt
-from prompt import prompt_int, select_multiple
+from prompt import prompt_int, select_multiple, NonInteractiveError
 
 opts_ci: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
 test_con: Console = Console(opts_ci)
 
-# 1. prompt_int in non-interactive mode
+# 1. prompt_int in non-interactive mode with default
 res_int_def: int = prompt_int("Enter port", 8080, None, None, 3, test_con)
 nox.test.assert_eq_int(res_int_def, 8080, "prompt_int must return default_val in CI")
 
-res_int_min: int = prompt_int("Enter count", None, 1, 100, 3, test_con)
-nox.test.assert_eq_int(res_int_min, 1, "prompt_int must fallback to min_val if no default")
+# prompt_int without default must raise NonInteractiveError
+int_err1: bool = False
+try:
+    prompt_int("Enter count", None, 1, 100, 3, test_con)
+except NonInteractiveError:
+    int_err1 = True
+nox.test.assert_true(int_err1, "prompt_int without default in CI must raise NonInteractiveError")
 
-res_int_zero: int = prompt_int("Enter number", None, None, None, 3, test_con)
-nox.test.assert_eq_int(res_int_zero, 0, "prompt_int defaults to 0 if completely unconstrained")
+int_err2: bool = False
+try:
+    prompt_int("Enter number", None, None, None, 3, test_con)
+except NonInteractiveError:
+    int_err2 = True
+nox.test.assert_true(int_err2, "prompt_int without default must raise NonInteractiveError")
 
 # 2. select_multiple in non-interactive mode
 frameworks: list[str] = ["Rune", "Nova", "Noxen", "Feather"]
@@ -29,10 +38,13 @@ nox.test.assert_eq_int(len(res_multi_def), 2, "select_multiple returns default_c
 nox.test.assert_eq_str(res_multi_def[0], "Rune", "First default matches")
 nox.test.assert_eq_str(res_multi_def[1], "Nova", "Second default matches")
 
-# Without default choices: falls back to first item
-res_multi_fallback: list[str] = select_multiple("Select frameworks", frameworks, None, test_con)
-nox.test.assert_eq_int(len(res_multi_fallback), 1, "select_multiple fallback returns single item list")
-nox.test.assert_eq_str(res_multi_fallback[0], "Rune", "First choice selected as fallback")
+# Without default choices: must raise NonInteractiveError
+multi_err: bool = False
+try:
+    select_multiple("Select frameworks", frameworks, None, test_con)
+except NonInteractiveError:
+    multi_err = True
+nox.test.assert_true(multi_err, "select_multiple without default must raise NonInteractiveError in CI")
 
 # Empty choices list
 empty_in: list[str] = []

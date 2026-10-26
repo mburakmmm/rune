@@ -40,20 +40,33 @@ BG_MAGENTA: str = "45"
 BG_CYAN: str = "46"
 BG_WHITE: str = "47"
 
+def clamp_byte(val: int) -> int:
+    if val < 0:
+        return 0
+    if val > 255:
+        return 255
+    return val
+
 def color_256(n: int) -> str:
-    return "38;5;" + str(n)
+    return "38;5;" + str(clamp_byte(n))
 
 def bg_256(n: int) -> str:
-    return "48;5;" + str(n)
+    return "48;5;" + str(clamp_byte(n))
 
 def color_rgb(r: int, g: int, b: int) -> str:
-    return "38;2;" + str(r) + ";" + str(g) + ";" + str(b)
+    return "38;2;" + str(clamp_byte(r)) + ";" + str(clamp_byte(g)) + ";" + str(clamp_byte(b))
 
 def bg_rgb(r: int, g: int, b: int) -> str:
-    return "48;2;" + str(r) + ";" + str(g) + ";" + str(b)
+    return "48;2;" + str(clamp_byte(r)) + ";" + str(clamp_byte(g)) + ";" + str(clamp_byte(b))
+
+def _is_hex_char(ch: str) -> bool:
+    if len(ch) != 1:
+        return False
+    b: int = ord(ch)
+    return (b >= 48 and b <= 57) or (b >= 65 and b <= 70) or (b >= 97 and b <= 102)
 
 def _hex_digit(ch: str) -> int:
-    b: int = nox.strings.byte_at(ch, 0)
+    b: int = ord(ch)
     if b >= 48 and b <= 57:
         return b - 48
     if b >= 65 and b <= 70:
@@ -67,6 +80,8 @@ def hex_to_rgb(hex_str: str) -> str:
     if nox.strings.starts_with(s, "#"):
         s = s[1:]
     if len(s) == 6:
+        if not _is_hex_char(s[0]) or not _is_hex_char(s[1]) or not _is_hex_char(s[2]) or not _is_hex_char(s[3]) or not _is_hex_char(s[4]) or not _is_hex_char(s[5]):
+            return ""
         r: int = _hex_digit(s[0]) * 16 + _hex_digit(s[1])
         g: int = _hex_digit(s[2]) * 16 + _hex_digit(s[3])
         b: int = _hex_digit(s[4]) * 16 + _hex_digit(s[5])
@@ -78,18 +93,33 @@ def hex_to_bg_rgb(hex_str: str) -> str:
     if nox.strings.starts_with(s, "#"):
         s = s[1:]
     if len(s) == 6:
+        if not _is_hex_char(s[0]) or not _is_hex_char(s[1]) or not _is_hex_char(s[2]) or not _is_hex_char(s[3]) or not _is_hex_char(s[4]) or not _is_hex_char(s[5]):
+            return ""
         r: int = _hex_digit(s[0]) * 16 + _hex_digit(s[1])
         g: int = _hex_digit(s[2]) * 16 + _hex_digit(s[3])
         b: int = _hex_digit(s[4]) * 16 + _hex_digit(s[5])
         return bg_rgb(r, g, b)
     return ""
 
+def _is_safe_sgr_params(s: str) -> bool:
+    if len(s) == 0:
+        return False
+    i: int = 0
+    while i < len(s):
+        c: str = s[i]
+        if not (c >= "0" and c <= "9") and c != ";":
+            return False
+        i = i + 1
+    return True
+
 def resolve_color_code(name: str) -> str:
     clean: str = nox.strings.lower(nox.strings.trim(name))
     if nox.strings.starts_with(clean, "#"):
         return hex_to_rgb(clean)
     if nox.strings.contains(clean, ";"):
-        return clean
+        if _is_safe_sgr_params(clean):
+            return clean
+        return ""
     if clean == "black":
         return COLOR_BLACK
     if clean == "red":
@@ -129,7 +159,9 @@ def resolve_bg_code(name: str) -> str:
     if nox.strings.starts_with(clean, "#"):
         return hex_to_bg_rgb(clean)
     if nox.strings.contains(clean, ";"):
-        return clean
+        if _is_safe_sgr_params(clean):
+            return clean
+        return ""
     if clean == "black":
         return BG_BLACK
     if clean == "red":
@@ -218,33 +250,31 @@ def strip_ansi(s: str) -> str:
     n: int = len(s)
     if n == 0:
         return ""
-    esc: int = 27
     out: str = ""
     i: int = 0
     while i < n:
-        b: int = nox.strings.byte_at(s, i)
-        if b == esc:
+        code: int = ord(s[i])
+        if code == 27: # ESC
             i = i + 1
             if i < n:
                 next_ch: str = s[i]
                 if next_ch == "[":
                     i = i + 1
                     while i < n:
-                        c: str = s[i]
-                        cb: int = nox.strings.byte_at(s, i)
+                        cb: int = ord(s[i])
                         if cb >= 64 and cb <= 126:
                             i = i + 1
                             break
                         i = i + 1
                 elif next_ch == "]":
-                    # OSC sequence (ends with BEL or ST)
+                    # OSC sequence (ends with BEL 7 or ST ESC \)
                     i = i + 1
                     while i < n:
-                        cb: int = nox.strings.byte_at(s, i)
-                        if cb == 7: # BEL
+                        cb: int = ord(s[i])
+                        if cb == 7:
                             i = i + 1
                             break
-                        if cb == esc and i + 1 < n and s[i + 1] == "\\":
+                        if cb == 27 and i + 1 < n and s[i + 1] == "\\":
                             i = i + 2
                             break
                         i = i + 1
@@ -256,23 +286,24 @@ def strip_ansi(s: str) -> str:
     return out
 
 def sanitize_ansi(s: str) -> str:
-    # Completely strips escape codes and unsafe control characters (0-31 except \n, \r, \t)
+    # Completely strips escape codes, C0 controls (except \n, \t), C1 controls (128-159), and standalone \r
     n: int = len(s)
     if n == 0:
         return ""
-    esc: int = 27
     out: str = ""
     i: int = 0
     while i < n:
-        b: int = nox.strings.byte_at(s, i)
-        if b == esc:
+        code: int = ord(s[i])
+
+        # 1. ESC sequences
+        if code == 27:
             i = i + 1
             if i < n:
                 next_ch: str = s[i]
                 if next_ch == "[":
                     i = i + 1
                     while i < n:
-                        cb: int = nox.strings.byte_at(s, i)
+                        cb: int = ord(s[i])
                         if cb >= 64 and cb <= 126:
                             i = i + 1
                             break
@@ -280,27 +311,69 @@ def sanitize_ansi(s: str) -> str:
                 elif next_ch == "]":
                     i = i + 1
                     while i < n:
-                        cb: int = nox.strings.byte_at(s, i)
+                        cb: int = ord(s[i])
                         if cb == 7:
                             i = i + 1
                             break
-                        if cb == esc and i + 1 < n and s[i + 1] == "\\":
+                        if cb == 27 and i + 1 < n and s[i + 1] == "\\":
                             i = i + 2
                             break
                         i = i + 1
                 else:
                     i = i + 1
-        elif b < 32 and b != 10 and b != 13 and b != 9:
-            # Control character rejected for security
+            continue
+
+        # 2. C1 control codes (0x80 to 0x9F / 128 to 159) & DEL (127)
+        if code == 127 or (code >= 128 and code <= 159):
             i = i + 1
-        else:
-            out = out + s[i]
+            continue
+
+        # 3. Carriage return handling (\r\n -> \n, standalone \r dropped to prevent line overwrite spoofing)
+        if code == 13:
+            if i + 1 < n and ord(s[i + 1]) == 10:
+                out = out + "\n"
+                i = i + 2
+            else:
+                i = i + 1
+            continue
+
+        # 4. Other C0 control characters (reject all < 32 except \n and \t)
+        if code < 32 and code != 10 and code != 9:
             i = i + 1
+            continue
+
+        out = out + s[i]
+        i = i + 1
+
     return out
+
+def char_width(c: str) -> int:
+    cp: int = ord(c)
+    # C0, C1, and DEL controls
+    if cp < 32 or (cp >= 127 and cp <= 159):
+        return 0
+    # Zero width combining & format characters (VS1-16, ZWJ, ZWNJ, etc.)
+    if (cp >= 768 and cp <= 879) or (cp >= 6832 and cp <= 6911) or (cp >= 7616 and cp <= 7679) or (cp >= 8400 and cp <= 8447) or (cp >= 65024 and cp <= 65039) or (cp >= 65056 and cp <= 65071):
+        return 0
+    if cp == 8203 or cp == 8204 or cp == 8205 or cp == 8206 or cp == 8207:
+        return 0
+    # CJK Wide and Fullwidth characters (width 2)
+    if (cp >= 4352 and cp <= 4447) or (cp >= 11904 and cp <= 12287) or (cp >= 12288 and cp <= 12350) or (cp >= 12352 and cp <= 12543) or (cp >= 12592 and cp <= 12799) or (cp >= 13312 and cp <= 19903) or (cp >= 19968 and cp <= 40959) or (cp >= 43360 and cp <= 43391) or (cp >= 44032 and cp <= 55203) or (cp >= 55216 and cp <= 55295) or (cp >= 63744 and cp <= 64255) or (cp >= 65281 and cp <= 65376) or (cp >= 65504 and cp <= 65510) or (cp >= 131072 and cp <= 262141):
+        return 2
+    # Emojis and Pictographs (width 2 in modern terminals)
+    if (cp >= 127744 and cp <= 128767) or (cp >= 128512 and cp <= 128591) or (cp >= 128640 and cp <= 128767) or (cp >= 129280 and cp <= 129535) or (cp >= 129648 and cp <= 129791) or (cp >= 9728 and cp <= 10175):
+        return 2
+    return 1
 
 def cell_width(s: str) -> int:
     clean: str = strip_ansi(s)
-    return len(clean)
+    w: int = 0
+    i: int = 0
+    n: int = len(clean)
+    while i < n:
+        w = w + char_width(clean[i])
+        i = i + 1
+    return w
 
 def truncate(s: str, max_width: int, ellipsis: str = "...") -> str:
     cw: int = cell_width(s)
@@ -308,12 +381,19 @@ def truncate(s: str, max_width: int, ellipsis: str = "...") -> str:
         return s
     ew: int = cell_width(ellipsis)
     if max_width <= ew:
-        return s[:max_width]
+        return ""
     target: int = max_width - ew
     clean: str = strip_ansi(s)
-    if target < 0:
-        target = 0
-    return clean[:target] + ellipsis
+    acc_w: int = 0
+    i: int = 0
+    n: int = len(clean)
+    while i < n:
+        ch_w: int = char_width(clean[i])
+        if acc_w + ch_w > target:
+            break
+        acc_w = acc_w + ch_w
+        i = i + 1
+    return clean[:i] + ellipsis
 
 def wrap_text(s: str, max_width: int) -> list[str]:
     lines: list[str] = []
@@ -339,17 +419,21 @@ def wrap_text(s: str, max_width: int) -> list[str]:
 
             if len(cur_line) == 0:
                 if w_len > max_width:
-                    chunk_start: int = 0
-                    while chunk_start < len(word):
-                        chunk_end: int = chunk_start + max_width
-                        if chunk_end > len(word):
-                            chunk_end = len(word)
-                        chunk: str = word[chunk_start:chunk_end]
-                        if len(chunk) == max_width:
-                            lines.append(chunk)
+                    chunk_str: str = ""
+                    chunk_w: int = 0
+                    ch_idx: int = 0
+                    while ch_idx < len(word):
+                        c: str = word[ch_idx]
+                        cw: int = char_width(c)
+                        if chunk_w + cw > max_width and len(chunk_str) > 0:
+                            lines.append(chunk_str)
+                            chunk_str = c
+                            chunk_w = cw
                         else:
-                            cur_line = chunk
-                        chunk_start = chunk_start + max_width
+                            chunk_str = chunk_str + c
+                            chunk_w = chunk_w + cw
+                        ch_idx = ch_idx + 1
+                    cur_line = chunk_str
                 else:
                     cur_line = word
             else:

@@ -17,12 +17,13 @@
 | **Phase 1.5: Advanced Render** | `v0.2.0` | Multiline table wrapping, 256/RGB colors, `Text`/`Span` | **Completed** | `text_test`, `core_color_wrap_test`, `table_multiline_test` |
 | **Phase 3.5: Advanced CLI** | `v0.3.0` | Choice/enum options, env fallbacks, repeated options, aliases | **Completed** | `cli_advanced_test` |
 | **Phase 2.5: Live Progress** | `v0.4.0` | Rate throttling, multi-task live layout, ETA/speed math | **Completed** | `progress_live_test` |
-| **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Next Up** | Pending |
-| **Phase 5: Terminal Markdown & DX** | `v0.6.0` | Basic terminal Markdown parser, syntax highlighter | **Planned** | Pending |
-| **Phase 5.5: Shell Completion** | `v0.7.0` | Bash, Zsh, Fish autocompletion script generation | **Planned** | Pending |
-| **Phase 5.8: Benchmarks & Perf** | `v0.8.0` | Allocation audits, 1000-row table & 1000-arg CLI benchmarks | **Planned** | Pending |
-| **Phase 5.9: Cross-Platform** | `v0.9.0` | Windows VT console compatibility & snapshot tests | **Planned** | Pending |
-| **Phase 6: Rune 1.0 Release** | `v1.0.0` | Public API freeze, complete documentation, release gates | **Target** | Full Suite |
+| **Phase 4.5: Advanced Prompts** | `v0.5.0` | Multi-select, input validators, retry limits | **Completed** | `prompt_advanced_test` |
+| **Phase 5: Terminal Markdown & DX** | `v0.6.0` | Basic terminal Markdown parser, syntax highlighter | **Completed** | `markdown_test`, `syntax_test` |
+| **Phase 5.5: Shell Completion** | `v0.7.0` | Bash, Zsh, Fish autocompletion script generation | **Completed** | `completion_test` |
+| **Phase 5.8: Benchmarks & Perf** | `v0.8.0` | Allocation audits, 1000-row table & 1000-arg CLI benchmarks | **Completed** | `benchmark_test`, `run_benchmarks` |
+| **Phase 5.9: Cross-Platform** | `v0.9.0` | Windows VT console compatibility & snapshot tests | **Completed** | `snapshot_test` |
+| **Phase 6: Rune 1.0 Release** | `v1.0.0` | Public API freeze, complete documentation, release gates | **Completed** | Full Suite (17 suites) |
+| **Phase 6.1: Security & Unicode** | `v1.0.1` | \r line spoofing fix, C1 stripping, cell_width wcwidth, CI prompts | **Completed** | `security_hardening_test` (18 suites) |
 | **Post-1.0: TUI Evaluation** | `v1.1+` / Sub | Alternate screen buffers, raw keyboard mode, event loop | **Deferred** | Design Review |
 
 ---
@@ -234,6 +235,32 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - [x] Deterministic exit codes (0, 1, 2) and cleanup safety.
   - [x] Sub-millisecond to low single-digit millisecond performance benchmark SLA.
   - [x] Comprehensive documentation, feature matrix, API reference, and compiling examples.
+
+---
+
+### 🛡️ v1.0.1 — Security, Unicode & Prompt Hardening (Completed)
+**Goal:** Address audit findings regarding ANSI sanitization, Unicode cell widths, and non-interactive consistency.
+
+- [x] **P0 — ANSI Sanitization Security**:
+  - Strip standalone `\r` (carriage return) to prevent terminal line overwrite spoofing attacks; normalize `\r\n` to `\n`.
+  - Strip C1 control codes (code points 128 to 159) to prevent 8-bit terminal control injections.
+  - Migrate parser from byte indexing to Unicode `ord(s[i])` scalars.
+- [x] **P1 — Unicode Display Cell Width (wcwidth)**:
+  - Accurate width calculation for CJK wide characters (`界` = 2, `你` = 2) and emojis (`🙂` = 2, `🦀` = 2).
+  - Combining marks (U+0300..U+036F), zero-width spaces, and variation selectors return 0.
+  - `truncate()` and `wrap_text()` updated to operate strictly on display cell widths.
+- [x] **P1 — Non-Interactive Prompt Consistency**:
+  - `prompt_int()`, `select_choice()`, and `select_multiple()` consistently raise `NonInteractiveError` when required inputs lack defaults in CI / non-TTY mode.
+- [x] **P1 — Color Code Validation**:
+  - `color_rgb()`, `bg_rgb()`, `color_256()`, `bg_256()` clamp values to `0..255`.
+  - `hex_to_rgb()` strictly validates all 6 hexadecimal characters; rejects invalid strings.
+  - `resolve_color_code()` validates semicolon SGR parameters to prevent parameter injection.
+- [x] **P1 — Progress Boundaries**:
+  - `Task.update()` and `Task.advance()` clamp completed values to `>= 0`.
+  - `Task.percentage()` clamped between 0 and 100.
+- [x] **P2 — Documentation Consistency**:
+  - Fully synchronized status dashboard at the top of `ROADMAP.md`.
+  - `tests/unit/security_hardening_test.nox` added (18/18 test suites passing).
 
 ---
 
