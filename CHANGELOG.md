@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-10-26
+
+### Added
+- **Syntax Highlighting (`rune.render`)**:
+  - `Syntax(code, language, line_numbers, start_line)`: fast, pure Nox lexical scanner for syntax highlighting.
+  - Highlights language keywords (`def`, `class`, `return`, `if`, etc.), builtins/types (`int`, `str`, `list`, etc.), string literals, numbers, comments, and operators.
+  - Optional line numbering with customizable start line and padded gutter (`│` / `|`).
+  - `highlight_code(code, language, line_numbers, options) -> str`.
+- **Terminal Markdown (`rune.render`)**:
+  - `Markdown(content)`: terminal markdown renderer supporting headings (`#`, `##`, `###`), bulleted and numbered lists, blockquotes (`>`), horizontal rules (`---`), and inline styling (bold, italic, code).
+  - Code blocks (```` ```nox ````) rendered inside styled panels with syntax highlighting.
+  - Full plain-text and ASCII fallback when ANSI color or Unicode is absent.
+  - `render_markdown(content, options) -> str`.
+- **Test Suites**:
+  - `tests/unit/syntax_test.nox`: tests tokenization, line numbers, ASCII fallback, color stripping, and ANSI injection sanitization.
+  - `tests/unit/markdown_test.nox`: tests headings, lists, blockquotes, code blocks, rules, and plain/ASCII fallback.
+
+---
+
 ## [0.5.0] - 2026-10-26
 
 ### Added

@@ -1,2 +1,2 @@
 import render
-from render import Rule, Panel, Table, Column, Row, Tree, TreeNode
+from render import Rule, Panel, Table, Column, Row, Tree, TreeNode, Syntax, SyntaxTheme, highlight_code, Markdown, render_markdown

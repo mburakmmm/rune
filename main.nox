@@ -1,12 +1,12 @@
 # main.nox — Rune CLI and Showcase Demonstration.
 
 import rune
-from rune import Console, Style, Rule, Panel, Table, Tree, TreeNode, ProgressBar, Task, Command, CliApp, CliResult, TYPE_STR, TYPE_INT, TYPE_BOOL
+from rune import Console, Style, Rule, Panel, Table, Tree, TreeNode, ProgressBar, Task, Command, CliApp, CliResult, Markdown, Syntax, TYPE_STR, TYPE_INT, TYPE_BOOL
 
 def run_showcase(console: Console) -> None:
     # 1. Title Banner
     console.print("")
-    rule_top: Rule = Rule("Rune 0.5.0 Showcase", "─", "center", Style("cyan", "", True))
+    rule_top: Rule = Rule("Rune 0.6.0 Showcase", "─", "center", Style("cyan", "", True))
     console.print(rule_top.render(console.options))
     console.print("")
 
@@ -54,7 +54,13 @@ def run_showcase(console: Console) -> None:
     console.print(tr.render(console.options))
     console.print("")
 
-    # 5. Progress Bar
+    # 5. Markdown with Syntax Highlighted Code
+    md_demo: str = "### Terminal Markdown & Syntax Highlighting\n> Rune renders native markdown documentation and syntax-highlighted code blocks!\n```nox\ndef greet(name: str) -> void:\n    # print friendly greeting\n    print(\"Hello, \" + name + \"!\")\n```"
+    md: Markdown = Markdown(md_demo)
+    console.print(md.render(console.options))
+    console.print("")
+
+    # 6. Progress Bar
     pb: ProgressBar = ProgressBar(20)
     task: Task = pb.add_task("Verifying test suites", 100)
     task.update(100)
@@ -73,7 +79,7 @@ cmd.add_option("version", "v", TYPE_BOOL, True, False, "false", "Print version")
 showcase_sub: Command = Command("demo", "Run interactive visual showcase")
 cmd.add_subcommand(showcase_sub)
 
-app: CliApp = CliApp(cmd, "0.5.0")
+app: CliApp = CliApp(cmd, "0.6.0")
 res: CliResult = app.parse([])
 
 # If run directly without args, show showcase

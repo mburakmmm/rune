@@ -1,0 +1,64 @@
+# tests/unit/markdown_test.nox — Unit tests for Terminal Markdown rendering.
+
+import nox.test
+import nox.strings
+import core
+from core import ConsoleOptions, strip_ansi, esc_code
+import markdown
+from markdown import Markdown, render_markdown
+
+# 1. Plain text mode rendering
+md_src: str = """# Welcome to Rune
+This is a **bold** statement and `inline code`.
+
+## Features
+- First feature
+- Second feature
+  - Nested detail
+1. Step one
+2. Step two
+
+> Rune is native to Nox.
+
+---
+```nox
+def main():
+    return 42
+```
+"""
+
+opts_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+md_obj: Markdown = Markdown(md_src)
+rendered_plain: str = md_obj.render(opts_plain)
+
+nox.test.assert_true(esc_code() not in rendered_plain, "Plain mode must have no ANSI escape sequences")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "Welcome to Rune"), "Must contain H1 header text")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "Features"), "Must contain H2 header text")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "• First feature"), "Must render unicode bullets")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "1. Step one"), "Must render numbered lists")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "│ Rune is native to Nox."), "Must render quote with vertical bar")
+nox.test.assert_true(nox.strings.contains(rendered_plain, "def main():"), "Must render code block content")
+
+# 2. Color mode rendering
+opts_color: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, True)
+rendered_color: str = md_obj.render(opts_color)
+
+nox.test.assert_true(esc_code() in rendered_color, "Color mode must contain ANSI escape codes")
+nox.test.assert_true(nox.strings.contains(strip_ansi(rendered_color), "Welcome to Rune"), "Stripped content must match")
+
+# 3. ASCII fallback (Unicode disabled)
+opts_ascii: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+rendered_ascii: str = md_obj.render(opts_ascii)
+
+nox.test.assert_true(nox.strings.contains(rendered_ascii, "==============="), "H1 underline must use '=' in ASCII mode")
+nox.test.assert_true(nox.strings.contains(rendered_ascii, "--------"), "H2 underline must use '-' in ASCII mode")
+nox.test.assert_true(nox.strings.contains(rendered_ascii, "- First feature"), "Bullets must fall back to '-' in ASCII mode")
+nox.test.assert_true(nox.strings.contains(rendered_ascii, "| Rune is native to Nox."), "Quote bar must fall back to '|' in ASCII mode")
+
+# 4. ANSI injection protection
+malicious_md: str = "# " + esc_code() + "[31mHacked Title" + esc_code() + "[0m\n> " + esc_code() + "]0;pwned"
+rendered_malicious: str = render_markdown(malicious_md, opts_plain)
+
+nox.test.assert_true(esc_code() not in rendered_malicious, "Sanitize must strip all raw escape codes from markdown input")
+
+print("markdown_test passed")

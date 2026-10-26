@@ -155,17 +155,22 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.6.0 — Terminal Markdown & Syntax Highlighting
+### 📦 v0.6.0 — Terminal Markdown & Syntax Highlighting (Completed)
 **Goal:** Rich readable documentation and code snippets inside the terminal.
 
-- [ ] **Terminal Markdown Subset**:
-  - Headings (`# H1`, `## H2`, `### H3`) rendered with distinctive styles and underlines.
+- [x] **Terminal Markdown Subset**:
+  - Headings (`# H1`, `## H2`, `### H3`) rendered with distinctive styles and underlines (`═` / `─` / ASCII fallback).
   - Bulleted (`*`, `-`) and numbered (`1.`) lists with indentation.
-  - Blockquotes (`> text`) with left border guides.
-  - Inline code (`` `code` ``) and code blocks (```` ```nox ````).
-- [ ] **Lightweight Nox Code Highlighter**:
-  - Highlight keywords (`def`, `class`, `import`, `return`, `if`, `else`).
-  - Highlight string literals, numeric literals, and comments (`#`).
+  - Blockquotes (`> text`) with left border guides (`│ ` / `| `).
+  - Inline code (`` `code` ``), bold (`**bold**`), italic (`*italic*`).
+  - Fenced code blocks (```` ```nox ````) framed in clean panels with syntax highlighting.
+- [x] **Lightweight Nox Code Highlighter**:
+  - Highlights keywords (`def`, `class`, `import`, `return`, `if`, `else`, etc.).
+  - Highlights builtin types (`int`, `str`, `float`, `bool`, `list`, etc.).
+  - Highlights string literals with escape sequence handling.
+  - Highlights numeric literals (integers, floats, hex `0x...`).
+  - Highlights comments (`# ...`) with dim styling.
+  - Configurable line numbers with padded gutter (`│` / `|`).
   - Pure Nox token-scanning implementation without heavy compiler dependencies.
 
 ---

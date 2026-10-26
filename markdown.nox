@@ -1,0 +1,315 @@
+# markdown.nox — Terminal markdown rendering with headers, lists, quotes, and syntax-highlighted code blocks.
+
+import nox.strings
+import core
+from core import Style, ConsoleOptions, sanitize_ansi, cell_width
+import syntax
+from syntax import Syntax
+
+def repeat_str(ch: str, count: int) -> str:
+    res: str = ""
+    i: int = 0
+    while i < count:
+        res = res + ch
+        i = i + 1
+    return res
+
+def is_digit_char(c: str) -> bool:
+    if len(c) != 1:
+        return False
+    return c >= "0" and c <= "9"
+
+def format_inline_markdown(s: str, options: ConsoleOptions) -> str:
+    if not options.supports_color:
+        return s
+
+    style_code: Style = Style("yellow")
+    style_bold: Style = Style("", "", True)
+    style_italic: Style = Style("", "", False, False, True)
+
+    res: str = ""
+    i: int = 0
+    n: int = len(s)
+
+    while i < n:
+        # 1. Inline code: `...`
+        if s[i] == "`":
+            end_code: int = -1
+            j: int = i + 1
+            while j < n:
+                if s[j] == "`":
+                    end_code = j
+                    break
+                j = j + 1
+            if end_code != -1:
+                code_text: str = s[i + 1:end_code]
+                res = res + style_code.apply(code_text)
+                i = end_code + 1
+                continue
+
+        # 2. Bold: **...**
+        if i + 1 < n and s[i] == "*" and s[i + 1] == "*":
+            end_bold: int = -1
+            j: int = i + 2
+            while j + 1 < n:
+                if s[j] == "*" and s[j + 1] == "*":
+                    end_bold = j
+                    break
+                j = j + 1
+            if end_bold != -1:
+                bold_text: str = s[i + 2:end_bold]
+                res = res + style_bold.apply(bold_text)
+                i = end_bold + 2
+                continue
+
+        # 3. Italic: *...*
+        if s[i] == "*":
+            end_italic: int = -1
+            j: int = i + 1
+            while j < n:
+                if s[j] == "*":
+                    end_italic = j
+                    break
+                j = j + 1
+            if end_italic != -1:
+                italic_text: str = s[i + 1:end_italic]
+                res = res + style_italic.apply(italic_text)
+                i = end_italic + 1
+                continue
+
+        res = res + s[i]
+        i = i + 1
+
+    return res
+
+class Markdown:
+    content: str
+
+    def __init__(self: Markdown, content: str) -> None:
+        self.content = content
+
+    def render(self: Markdown, options: ConsoleOptions) -> str:
+        safe_content: str = sanitize_ansi(self.content)
+        lines: list[str] = nox.strings.split(safe_content, "\n")
+        total_lines: int = len(lines)
+
+        output_lines: list[str] = []
+        in_code_block: bool = False
+        code_lang: str = ""
+        code_buf: list[str] = []
+
+        idx: int = 0
+        while idx < total_lines:
+            line: str = lines[idx]
+            trimmed: str = nox.strings.trim(line)
+
+            # Check code block start / end
+            if nox.strings.starts_with(trimmed, "```"):
+                if in_code_block:
+                    # End code block
+                    code_raw: str = nox.strings.join(code_buf, "\n")
+                    syn: Syntax = Syntax(code_raw, code_lang, False)
+                    highlighted: str = syn.render(options)
+                    hl_lines: list[str] = nox.strings.split(highlighted, "\n")
+
+                    # Border characters
+                    box_tl: str = "╭─ "
+                    box_tr: str = "─╮"
+                    box_bl: str = "╰─"
+                    box_br: str = "─╯"
+                    box_bar: str = "│ "
+                    box_h: str = "─"
+
+                    if not options.supports_unicode:
+                        box_tl = "+-- "
+                        box_tr = "--+"
+                        box_bl = "+--"
+                        box_br = "--+"
+                        box_bar = "| "
+                        box_h = "-"
+
+                    w: int = options.width
+                    if w < 20:
+                        w = 20
+
+                    lang_tag: str = code_lang
+                    if len(lang_tag) == 0:
+                        lang_tag = "code"
+
+                    header_fill_len: int = w - 6 - len(lang_tag)
+                    if header_fill_len < 2:
+                        header_fill_len = 2
+
+                    footer_fill_len: int = w - 4
+                    if footer_fill_len < 2:
+                        footer_fill_len = 2
+
+                    top_line: str = ""
+                    bottom_line: str = ""
+                    if options.supports_color:
+                        top_line = Style("dim").apply(box_tl) + Style("bright_blue", "", True).apply(lang_tag) + Style("dim").apply(" " + repeat_str(box_h, header_fill_len) + box_tr)
+                        bottom_line = Style("dim").apply(box_bl + repeat_str(box_h, footer_fill_len) + box_br)
+                    else:
+                        top_line = box_tl + lang_tag + " " + repeat_str(box_h, header_fill_len) + box_tr
+                        bottom_line = box_bl + repeat_str(box_h, footer_fill_len) + box_br
+
+                    output_lines.append(top_line)
+                    for hl_l in hl_lines:
+                        bar_prefix: str = box_bar
+                        if options.supports_color:
+                            bar_prefix = Style("dim").apply(box_bar)
+                        output_lines.append(bar_prefix + hl_l)
+                    output_lines.append(bottom_line)
+
+                    in_code_block = False
+                    code_lang = ""
+                    code_buf = []
+                    idx = idx + 1
+                    continue
+                else:
+                    # Start code block
+                    in_code_block = True
+                    code_lang = nox.strings.trim(trimmed[3:])
+                    code_buf = []
+                    idx = idx + 1
+                    continue
+
+            if in_code_block:
+                code_buf.append(line)
+                idx = idx + 1
+                continue
+
+            # Blank line
+            if len(trimmed) == 0:
+                output_lines.append("")
+                idx = idx + 1
+                continue
+
+            # Horizontal Rule: --- or ***
+            if trimmed == "---" or trimmed == "***" or trimmed == "___":
+                rw: int = options.width
+                if rw < 10:
+                    rw = 10
+                rch: str = "─"
+                if not options.supports_unicode:
+                    rch = "-"
+                r_line: str = repeat_str(rch, rw)
+                if options.supports_color:
+                    r_line = Style("dim").apply(r_line)
+                output_lines.append(r_line)
+                idx = idx + 1
+                continue
+
+            # Heading 1: # Title
+            if nox.strings.starts_with(trimmed, "# "):
+                h1_text: str = nox.strings.trim(trimmed[2:])
+                styled_h1: str = h1_text
+                if options.supports_color:
+                    styled_h1 = Style("bright_cyan", "", True).apply(h1_text)
+
+                u_ch: str = "═"
+                if not options.supports_unicode:
+                    u_ch = "="
+                u_len: int = cell_width(h1_text)
+                if u_len < 3:
+                    u_len = 3
+                u_line: str = repeat_str(u_ch, u_len)
+                if options.supports_color:
+                    u_line = Style("cyan").apply(u_line)
+
+                output_lines.append(styled_h1)
+                output_lines.append(u_line)
+                idx = idx + 1
+                continue
+
+            # Heading 2: ## Title
+            if nox.strings.starts_with(trimmed, "## "):
+                h2_text: str = nox.strings.trim(trimmed[3:])
+                styled_h2: str = h2_text
+                if options.supports_color:
+                    styled_h2 = Style("bright_white", "", True).apply(h2_text)
+
+                u2_ch: str = "─"
+                if not options.supports_unicode:
+                    u2_ch = "-"
+                u2_len: int = cell_width(h2_text)
+                if u2_len < 3:
+                    u2_len = 3
+                u2_line: str = repeat_str(u2_ch, u2_len)
+                if options.supports_color:
+                    u2_line = Style("dim").apply(u2_line)
+
+                output_lines.append(styled_h2)
+                output_lines.append(u2_line)
+                idx = idx + 1
+                continue
+
+            # Heading 3: ### Title
+            if nox.strings.starts_with(trimmed, "### "):
+                h3_text: str = nox.strings.trim(trimmed[4:])
+                if options.supports_color:
+                    output_lines.append(Style("bright_yellow", "", True).apply("### ") + Style("bold").apply(h3_text))
+                else:
+                    output_lines.append("### " + h3_text)
+                idx = idx + 1
+                continue
+
+            # Blockquote: > Quote
+            if nox.strings.starts_with(trimmed, ">"):
+                quote_text: str = nox.strings.trim(trimmed[1:])
+                q_bar: str = "│ "
+                if not options.supports_unicode:
+                    q_bar = "| "
+
+                if options.supports_color:
+                    output_lines.append(Style("cyan").apply(q_bar) + Style("", "", False, False, True).apply(format_inline_markdown(quote_text, options)))
+                else:
+                    output_lines.append(q_bar + quote_text)
+                idx = idx + 1
+                continue
+
+            # Count indentation spaces
+            leading_spaces: int = 0
+            while leading_spaces < len(line) and line[leading_spaces] == " ":
+                leading_spaces = leading_spaces + 1
+            indent_str: str = repeat_str(" ", leading_spaces)
+
+            # Bulleted List: - item or * item
+            if nox.strings.starts_with(trimmed, "- ") or nox.strings.starts_with(trimmed, "* "):
+                bullet_char: str = "• "
+                if not options.supports_unicode:
+                    bullet_char = "- "
+
+                item_content: str = trimmed[2:]
+                if options.supports_color:
+                    bullet_char = Style("bright_cyan", "", True).apply(bullet_char)
+
+                output_lines.append(indent_str + bullet_char + format_inline_markdown(item_content, options))
+                idx = idx + 1
+                continue
+
+            # Numbered List: 1. item, 2. item...
+            if len(trimmed) >= 3 and is_digit_char(trimmed[0]):
+                dot_idx: int = nox.strings.index_of(trimmed, ". ")
+                if dot_idx > 0 and dot_idx <= 4:
+                    num_prefix: str = trimmed[0:dot_idx + 2]
+                    num_content: str = trimmed[dot_idx + 2:]
+                    if options.supports_color:
+                        num_prefix = Style("bright_blue").apply(num_prefix)
+
+                    output_lines.append(indent_str + num_prefix + format_inline_markdown(num_content, options))
+                    idx = idx + 1
+                    continue
+
+            # Normal Paragraph Text
+            output_lines.append(format_inline_markdown(line, options))
+            idx = idx + 1
+
+        return nox.strings.join(output_lines, "\n")
+
+def render_markdown(content: str, options: ConsoleOptions | None = None) -> str:
+    opts: ConsoleOptions = ConsoleOptions()
+    if options is not None:
+        opts = options
+    md: Markdown = Markdown(content)
+    return md.render(opts)

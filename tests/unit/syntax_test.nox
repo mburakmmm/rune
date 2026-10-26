@@ -1,0 +1,49 @@
+# tests/unit/syntax_test.nox — Unit tests for terminal syntax highlighting.
+
+import nox.test
+import nox.strings
+import core
+from core import ConsoleOptions, strip_ansi, esc_code
+import syntax
+from syntax import Syntax, highlight_code
+
+# 1. Plain text mode (no color)
+code_sample: str = "def add(a: int, b: int) -> int:\n    # return sum\n    return a + b"
+opts_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+syn_plain: Syntax = Syntax(code_sample, "nox", False)
+rendered_plain: str = syn_plain.render(opts_plain)
+
+nox.test.assert_eq_str(rendered_plain, code_sample, "In plain mode, rendered code must match raw input")
+nox.test.assert_true(esc_code() not in rendered_plain, "Plain mode must not contain ANSI escape codes")
+
+# 2. Syntax highlighting with color
+opts_color: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, True)
+syn_color: Syntax = Syntax("def hello():\n    return \"world\"", "nox", False)
+rendered_color: str = syn_color.render(opts_color)
+
+nox.test.assert_true(esc_code() in rendered_color, "Highlighted code must contain ANSI escape codes")
+nox.test.assert_eq_str(strip_ansi(rendered_color), "def hello():\n    return \"world\"", "Stripped text must match original code")
+
+# 3. Line numbers formatting
+code_lines: str = "x: int = 42\ny: int = 100"
+syn_numbered: Syntax = Syntax(code_lines, "nox", True, 1)
+rendered_numbered: str = syn_numbered.render(opts_plain)
+
+nox.test.assert_true(nox.strings.starts_with(rendered_numbered, " 1 │ x: int = 42"), "Line numbers must be padded with unicode gutter")
+nox.test.assert_true(nox.strings.contains(rendered_numbered, " 2 │ y: int = 100"), "Second line number must match")
+
+# 4. ASCII gutter fallback
+opts_ascii: ConsoleOptions = ConsoleOptions(False, False, 80, 24, False, True)
+syn_ascii: Syntax = Syntax("val: str = 'test'", "nox", True, 10)
+rendered_ascii: str = syn_ascii.render(opts_ascii)
+
+nox.test.assert_true(nox.strings.starts_with(rendered_ascii, "10 | val: str = 'test'"), "ASCII fallback must use | instead of │")
+
+# 5. ANSI injection sanitization
+malicious: str = esc_code() + "[31mdef evil():" + esc_code() + "[0m return 1"
+syn_sanitized: Syntax = Syntax(malicious, "nox", False)
+rendered_sanitized: str = syn_sanitized.render(opts_plain)
+
+nox.test.assert_true(esc_code() not in rendered_sanitized, "Untrusted escape codes must be stripped by sanitize_ansi")
+
+print("syntax_test passed")

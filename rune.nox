@@ -18,8 +18,14 @@ from table import Table, Column, Row
 import tree
 from tree import Tree, TreeNode
 
+import syntax
+from syntax import Syntax, SyntaxTheme, highlight_code
+
+import markdown
+from markdown import Markdown, render_markdown
+
 import render
-from render import Rule as RenderRule, Panel as RenderPanel, Table as RenderTable, Tree as RenderTree
+from render import Rule as RenderRule, Panel as RenderPanel, Table as RenderTable, Tree as RenderTree, Syntax as RenderSyntax, Markdown as RenderMarkdown
 
 import progress
 from progress import Task, ProgressBar, Spinner, format_duration, format_bytes, pad_num

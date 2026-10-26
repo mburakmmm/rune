@@ -1,4 +1,4 @@
-# render.nox — Facade for visual components: Rule, Panel, Table, and Tree.
+# render.nox — Facade for visual components: Rule, Panel, Table, Tree, Syntax, and Markdown.
 
 import rule
 from rule import Rule
@@ -11,3 +11,9 @@ from table import Table, Column, Row
 
 import tree
 from tree import Tree, TreeNode
+
+import syntax
+from syntax import Syntax, SyntaxTheme, highlight_code
+
+import markdown
+from markdown import Markdown, render_markdown

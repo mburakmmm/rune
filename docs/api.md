@@ -137,6 +137,31 @@ class Tree:
     def render(self: Tree, options: ConsoleOptions) -> str: ...
 ```
 
+### `Syntax`
+```nox
+def highlight_code(code: str, language: str = "nox", line_numbers: bool = False, options: ConsoleOptions | None = None) -> str: ...
+
+class Syntax:
+    code: str
+    language: str
+    line_numbers: bool
+    start_line: int
+
+    def __init__(self: Syntax, code: str, language: str = "nox", line_numbers: bool = False, start_line: int = 1) -> None: ...
+    def render(self: Syntax, options: ConsoleOptions) -> str: ...
+```
+
+### `Markdown`
+```nox
+def render_markdown(content: str, options: ConsoleOptions | None = None) -> str: ...
+
+class Markdown:
+    content: str
+
+    def __init__(self: Markdown, content: str) -> None: ...
+    def render(self: Markdown, options: ConsoleOptions) -> str: ...
+```
+
 ---
 
 ## 3. `rune.progress`
