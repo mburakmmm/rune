@@ -118,22 +118,36 @@ Options:
 | Category | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
 | **Styling** | ANSI 16 Colors (fg/bg) | **Supported** | Automatic reset prevention |
+| **Styling** | Truecolor 24-bit RGB & ANSI 256 | **Supported** | Hex `#RRGGBB`, RGB tuples, 256 palette |
 | **Styling** | Bold, Dim, Italic, Underline | **Supported** | Standards-compliant SGR codes |
 | **Styling** | `NO_COLOR` / `CLICOLOR_FORCE` | **Supported** | Strictly respects CLI conventions |
+| **Styling** | Windows VT Mode / Terminal Detection | **Supported** | `WT_SESSION`, `ANSICON`, `ConEmuANSI` |
 | **Styling** | ANSI Escape Sanitization | **Supported** | Protects against OSC/CSI injection |
 | **Render** | Rule Dividers | **Supported** | Centered / Left / Right titles |
 | **Render** | Box Panels | **Supported** | Rounded, Square, Double, ASCII borders |
-| **Render** | Structured Tables | **Supported** | Dynamic width calculation, multiline safe |
+| **Render** | Structured Tables | **Supported** | Dynamic width calculation, multiline wrapping |
 | **Render** | Hierarchical Trees | **Supported** | Iterative stack rendering (no recursion limit) |
-| **Progress** | Progress Bars | **Supported** | Total/completed tracking, ASCII fallback |
+| **Render** | Terminal Markdown | **Supported** | Headings, lists, quotes, rules, inline styling |
+| **Render** | Syntax Highlighting | **Supported** | Pure Nox token lexer for code blocks & snippets |
+| **Progress** | Multi-Task Live Progress | **Supported** | Concurrent task layout (`render_all`) |
+| **Progress** | Monotonic ETA & Speed | **Supported** | Monotonic clock rate, `format_eta`, `format_bytes` |
 | **Progress** | Spinners | **Supported** | Plain text status in CI/non-TTY |
 | **Prompts** | Line Input with Defaults | **Supported** | Line-buffered via `input()` |
+| **Prompts** | Validated Integer Input | **Supported** | `prompt_int` with min/max range & retry loop |
+| **Prompts** | Multi-Select Choices | **Supported** | `select_multiple` with numbers, names, or `all` |
 | **Prompts** | Confirm [Y/n] | **Supported** | Safe boolean parser |
 | **Prompts** | Choice Selection | **Supported** | 1-indexed selection or name matching |
 | **Prompts** | Password Masking | **Unsupported** | Requires runtime raw terminal/no-echo mode |
 | **CLI** | Positional Arguments | **Supported** | Required, optional, typed conversions |
 | **CLI** | Long & Short Options | **Supported** | `--key val`, `--key=val`, `-k val`, flags |
+| **CLI** | Choices & Enum Validation | **Supported** | `choices: list[str]` with diagnostic errors |
+| **CLI** | Environment Variable Fallback | **Supported** | `CLI arg > Env var > Declared default` |
+| **CLI** | Clustered Short Flags | **Supported** | `-xvf` automatically expands to `-x`, `-v`, `-f` |
+| **CLI** | Repeated / Multiple Options | **Supported** | Accumulate values via `ctx.get_list()` |
+| **CLI** | Secret Redaction | **Supported** | `is_secret` masks default values in help/logs |
+| **CLI** | Command Aliases | **Supported** | Aliases (`ci` for `commit`) displayed in help |
 | **CLI** | Subcommands | **Supported** | Arbitrary nesting (`git commit`) |
+| **CLI** | Shell Autocompletion | **Supported** | Native generator for Bash, Zsh, and Fish |
 | **CLI** | Standard Exit Codes | **Supported** | 0 (success/help), 2 (usage error), 1 (failure) |
 
 ---

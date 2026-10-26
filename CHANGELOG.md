@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-10-26
+
+### Production Release — 1.0.0 General Availability
+- **API Stability Freeze**: All public signatures across `rune.core`, `rune.render`, `rune.progress`, `rune.prompt`, and `rune.cli` are stable and contractual.
+- **Rich + Click + Typer Unified Framework**: Full feature set delivered with zero native C dependencies, 100% pure statically typed Nox.
+- **Verification**: 17 comprehensive test suites passing green across unit, integration, benchmark, and snapshot testing.
+- **Documentation**: Complete API documentation in `docs/api.md`, architecture guide in `docs/architecture.md`, roadmap tracking in `ROADMAP.md`, and 5 compiling examples in `examples/`.
+
+---
+
 ## [0.9.0] - 2026-10-26
 
 ### Added

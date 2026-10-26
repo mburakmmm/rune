@@ -1,0 +1,28 @@
+# examples/markdown_demo.nox — Terminal Markdown and Syntax Highlighting example.
+
+import rune
+from rune import Console, Markdown, Syntax
+
+console: Console = Console()
+
+md_text: str = """# Rune Toolkit v1.0.0
+Unified Rich + Click + Typer framework for Nox.
+
+## Key Features
+- **Deterministic**: Pure Nox without native C dependencies.
+- *Styling*: Truecolor 24-bit RGB, 256 colors, and plain-text fallback.
+- Components:
+  - Tables with multiline cell wrapping.
+  - Boxed panels with rounded/ascii borders.
+  - Syntax highlighted code blocks.
+
+> Rune is built natively for the Nox ecosystem.
+
+```nox
+def greet(name: str) -> void:
+    print("Welcome to Rune, " + name + "!")
+```
+"""
+
+md: Markdown = Markdown(md_text)
+console.print(md.render(console.options))

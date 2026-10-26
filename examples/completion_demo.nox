@@ -1,0 +1,16 @@
+# examples/completion_demo.nox — Shell completion generation demo.
+
+import rune
+from rune import Command, TYPE_STR, TYPE_BOOL, generate_bash_completion, generate_fish_completion, generate_zsh_completion
+
+app_cmd: Command = Command("deploy", "Cloud deployment utility")
+app_cmd.add_option("env", "e", TYPE_STR, False, False, "staging", "Target environment", ["dev", "staging", "prod"])
+app_cmd.add_option("dry-run", "d", TYPE_BOOL, True, False, "false", "Simulate deployment")
+
+app_cmd.add_subcommand(Command("services", "List running services"))
+app_cmd.add_subcommand(Command("rollback", "Rollback to previous release"))
+
+# Generate Bash completion script
+bash_script: str = generate_bash_completion(app_cmd)
+print("# Generated Bash Completion:")
+print(bash_script)
