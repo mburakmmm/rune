@@ -189,6 +189,9 @@ Options:
 | **TUI** | Rect Geometry & Insets | **Supported** | 2D coordinates, area, inner margins, union, intersection |
 | **TUI** | Flex Layout Solver | **Supported** | Length, Percentage, Ratio, Min, Max constraints |
 | **TUI** | Declarative Widgets | **Supported** | Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar |
+| **TUI** | ANSI Key Sequence Decoder | **Supported** | Arrow keys, VT/xterm function keys, Ctrl/Alt/Shift modifiers |
+| **TUI** | Event Model & Loop | **Supported** | `KeyEvent`, `TickEvent`, `ResizeEvent`, monotonic frame loop |
+| **TUI** | Elm/Bubbletea Runtime | **Supported** | `TuiApp` lifecycle (`init`, `update`, `view`), `AppRunner` |
 
 ---
 

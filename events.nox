@@ -1,0 +1,270 @@
+# events.nox — ANSI key sequence decoder, terminal events, and event structures for Rune TUI.
+
+import nox.strings
+
+EVENT_KEY: int = 1
+EVENT_TICK: int = 2
+EVENT_RESIZE: int = 3
+
+class KeyEvent:
+    key: str
+    ctrl: bool
+    alt: bool
+    shift: bool
+
+    def __init__(self: KeyEvent, key: str, ctrl: bool = False, alt: bool = False, shift: bool = False) -> None:
+        self.key = key
+        self.ctrl = ctrl
+        self.alt = alt
+        self.shift = shift
+
+    def to_str(self: KeyEvent) -> str:
+
+        res: str = ""
+        if self.ctrl:
+            res = res + "ctrl+"
+        if self.alt:
+            res = res + "alt+"
+        if self.shift:
+            res = res + "shift+"
+        res = res + self.key
+        return res
+
+    def matches(self: KeyEvent, pattern: str) -> bool:
+
+        pat: str = nox.strings.lower(pattern)
+        if self.to_str() == pat:
+            return True
+        if self.key == pat and not self.ctrl and not self.alt:
+            return True
+        return False
+
+class TickEvent:
+    delta_ms: int
+
+    def __init__(self: TickEvent, delta_ms: int = 0) -> None:
+        self.delta_ms = delta_ms
+
+class ResizeEvent:
+    width: int
+    height: int
+
+    def __init__(self: ResizeEvent, width: int, height: int) -> None:
+        self.width = width
+        self.height = height
+
+class Event:
+    type: int
+    key: str
+    ctrl: bool
+    alt: bool
+    shift: bool
+    delta_ms: int
+    width: int
+    height: int
+
+    def __init__(self: Event, type: int, key: str = "", ctrl: bool = False, alt: bool = False, shift: bool = False, delta_ms: int = 0, width: int = 0, height: int = 0) -> None:
+        self.type = type
+        self.key = key
+        self.ctrl = ctrl
+        self.alt = alt
+        self.shift = shift
+        self.delta_ms = delta_ms
+        self.width = width
+        self.height = height
+
+    def to_key_event(self: Event) -> KeyEvent:
+
+        return KeyEvent(self.key, self.ctrl, self.alt, self.shift)
+
+    def is_key(self: Event, expected: str = "") -> bool:
+
+        if self.type != EVENT_KEY:
+            return False
+        if len(expected) == 0:
+            return True
+        return self.to_key_event().matches(expected)
+
+    def is_ctrl(self: Event, expected: str = "") -> bool:
+
+        if self.type != EVENT_KEY or not self.ctrl:
+            return False
+        if len(expected) == 0:
+            return True
+        return self.key == expected
+
+    def is_tick(self: Event) -> bool:
+
+        return self.type == EVENT_TICK
+
+    def is_resize(self: Event) -> bool:
+
+        return self.type == EVENT_RESIZE
+
+    def key_str(self: Event) -> str:
+
+        if self.type != EVENT_KEY:
+            return ""
+        return self.to_key_event().to_str()
+
+def make_key_event(key: str, ctrl: bool = False, alt: bool = False, shift: bool = False) -> Event:
+    return Event(EVENT_KEY, key, ctrl, alt, shift, 0, 0, 0)
+
+def make_tick_event(delta_ms: int) -> Event:
+    return Event(EVENT_TICK, "", False, False, False, delta_ms, 0, 0)
+
+def make_resize_event(width: int, height: int) -> Event:
+    return Event(EVENT_RESIZE, "", False, False, False, 0, width, height)
+
+class KeyDecoder:
+    def __init__(self: KeyDecoder) -> None:
+        pass
+
+    def decode(self: KeyDecoder, raw: str) -> list[KeyEvent]:
+
+        decoded: list[KeyEvent] = []
+        n: int = len(raw)
+        i: int = 0
+        while i < n:
+            ch: str = raw[i]
+            b: int = ord(ch)
+
+            # 1. Escape Sequences
+            if b == 27:
+                if i + 1 >= n:
+                    decoded.append(KeyEvent("esc"))
+                    i = i + 1
+                    continue
+                next_ch: str = raw[i + 1]
+
+                # CSI: \x1b[
+                if next_ch == "[":
+                    # Look ahead for terminator character (ASCII 0x40 to 0x7E)
+                    j: int = i + 2
+                    while j < n and not (ord(raw[j]) >= 64 and ord(raw[j]) <= 126):
+                        j = j + 1
+                    if j < n:
+                        term: str = raw[j]
+                        param_str: str = raw[i + 2:j]
+                        ctrl: bool = False
+                        alt: bool = False
+                        shift: bool = False
+
+                        if nox.strings.contains(param_str, ";"):
+                            parts: list[str] = nox.strings.split(param_str, ";")
+                            if len(parts) >= 2:
+                                mod: str = parts[1]
+                                if mod == "2":
+                                    shift = True
+                                elif mod == "3":
+                                    alt = True
+                                elif mod == "5":
+                                    ctrl = True
+                                elif mod == "6":
+                                    ctrl = True
+                                    shift = True
+
+                        if term == "A":
+                            decoded.append(KeyEvent("up", ctrl, alt, shift))
+                        elif term == "B":
+                            decoded.append(KeyEvent("down", ctrl, alt, shift))
+                        elif term == "C":
+                            decoded.append(KeyEvent("right", ctrl, alt, shift))
+                        elif term == "D":
+                            decoded.append(KeyEvent("left", ctrl, alt, shift))
+                        elif term == "H":
+                            decoded.append(KeyEvent("home", ctrl, alt, shift))
+                        elif term == "F":
+                            decoded.append(KeyEvent("end", ctrl, alt, shift))
+                        elif term == "Z":
+                            decoded.append(KeyEvent("backtab", False, False, True))
+                        elif term == "~":
+                            p: str = param_str
+                            if nox.strings.contains(p, ";"):
+                                p = nox.strings.split(p, ";")[0]
+                            if p == "1":
+                                decoded.append(KeyEvent("home"))
+                            elif p == "2":
+                                decoded.append(KeyEvent("insert"))
+                            elif p == "3":
+                                decoded.append(KeyEvent("delete"))
+                            elif p == "4":
+                                decoded.append(KeyEvent("end"))
+                            elif p == "5":
+                                decoded.append(KeyEvent("pageup"))
+                            elif p == "6":
+                                decoded.append(KeyEvent("pagedown"))
+                            elif p == "11":
+                                decoded.append(KeyEvent("f1"))
+                            elif p == "12":
+                                decoded.append(KeyEvent("f2"))
+                            elif p == "13":
+                                decoded.append(KeyEvent("f3"))
+                            elif p == "14":
+                                decoded.append(KeyEvent("f4"))
+                            elif p == "15":
+                                decoded.append(KeyEvent("f5"))
+                            elif p == "17":
+                                decoded.append(KeyEvent("f6"))
+                            elif p == "18":
+                                decoded.append(KeyEvent("f7"))
+                            elif p == "19":
+                                decoded.append(KeyEvent("f8"))
+                            elif p == "20":
+                                decoded.append(KeyEvent("f9"))
+                            elif p == "21":
+                                decoded.append(KeyEvent("f10"))
+                            elif p == "23":
+                                decoded.append(KeyEvent("f11"))
+                            elif p == "24":
+                                decoded.append(KeyEvent("f12"))
+                        i = j + 1
+                        continue
+                    else:
+                        decoded.append(KeyEvent("esc"))
+                        i = i + 1
+                        continue
+                elif next_ch == "O":
+
+                    # SS3: \x1bO
+                    if i + 2 < n:
+                        fn: str = raw[i + 2]
+                        if fn == "P":
+                            decoded.append(KeyEvent("f1"))
+                        elif fn == "Q":
+                            decoded.append(KeyEvent("f2"))
+                        elif fn == "R":
+                            decoded.append(KeyEvent("f3"))
+                        elif fn == "S":
+                            decoded.append(KeyEvent("f4"))
+                        i = i + 3
+                        continue
+                    else:
+                        decoded.append(KeyEvent("esc"))
+                        i = i + 1
+                        continue
+                else:
+
+                    # Alt + character: \x1b<char>
+                    decoded.append(KeyEvent(next_ch, False, True, False))
+                    i = i + 2
+                    continue
+            elif b == 9:
+
+                # 2. Control Characters
+                decoded.append(KeyEvent("tab"))
+            elif b == 10 or b == 13:
+                decoded.append(KeyEvent("enter"))
+            elif b == 127 or b == 8:
+                decoded.append(KeyEvent("backspace"))
+            elif b >= 1 and b <= 26:
+                ctrl_key: str = chr(96 + b)
+                decoded.append(KeyEvent(ctrl_key, True, False, False))
+            else:
+
+                # 3. Standard Characters
+                decoded.append(KeyEvent(ch, False, False, False))
+
+            i = i + 1
+
+        return decoded

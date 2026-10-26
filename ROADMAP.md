@@ -27,7 +27,7 @@
 | **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Completed** | `tui_buffer_test` (19 suites) |
 | **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Completed** | `tui_layout_test` (20 suites) |
 | **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Completed** | `tui_widgets_test` (21 suites) |
-| **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Planned** | `tui_app_test` |
+| **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Completed** | `tui_app_test` (22 suites) |
 
 ---
 
@@ -339,21 +339,26 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 🎮 v1.4.0 — Phase 10: Event Loop & Interactive App Runner (Planned)
+### 🎮 v1.4.0 — Phase 10: Event Loop & Interactive App Runner (Completed)
 **Goal:** Deliver an event-driven application runtime (Elm Architecture / Bubbletea style) for full-screen Nox applications.
 
-- [ ] **ANSI Key & Escape Sequence Parser**:
+- [x] **ANSI Key & Escape Sequence Parser (`KeyDecoder`)**:
   - Parse VT escape sequences: Arrow keys (Up, Down, Left, Right), Home, End, PageUp, PageDown, Delete, Backspace, Enter, Tab, Esc.
-  - Detect Ctrl combinations (`Ctrl+C`, `Ctrl+D`).
-- [ ] **Event Model (`Event`)**:
-  - `KeyEvent(key: str, ctrl: bool, alt: bool)`.
+  - Detect Ctrl combinations (`Ctrl+C`, `Ctrl+D`, `Ctrl+A`..`Ctrl+Z`), Alt combinations (`Alt+Key`), Shift modifications (`Shift+Tab`, `Shift+Up`).
+- [x] **Event Model (`Event`)**:
+  - `KeyEvent(key: str, ctrl: bool, alt: bool, shift: bool)`.
   - `TickEvent(delta_ms: int)` for periodic animations and telemetry refresh.
   - `ResizeEvent(width: int, height: int)` for terminal size adjustments.
-- [ ] **TUI Application Runtime (`TuiApp` & `Frame`)**:
+  - Helper functions: `make_key_event()`, `make_tick_event()`, `make_resize_event()`.
+- [x] **TUI Application Runtime (`TuiApp`, `Frame`, `AppRunner`)**:
   - Lifecycle methods: `init()`, `update(event) -> bool`, `view(frame: Frame)`.
-  - Redraw scheduling: render only when state changes or timer ticks.
-- [ ] **Complete TUI Showcase App**:
+  - Elm/Bubbletea state transition architecture.
+  - `run_event_stream()` for deterministic testing and automated headless execution.
+  - `run_interactive()` with alt-screen management and guaranteed `restore()` cleanup.
+- [x] **Complete TUI Showcase App**:
   - Interactive system monitor / process dashboard example in `examples/tui_dashboard.nox`.
+- [x] **Comprehensive Test Suite**:
+  - Added `tests/unit/tui_app_test.nox` (22 suites total).
 
 ---
 

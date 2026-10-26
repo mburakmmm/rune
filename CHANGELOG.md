@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-10-26
+
+### Added (Phase 10: Event Loop & Interactive App Runner)
+- **`events.nox` — Terminal Event Engine**:
+  - `KeyEvent`: Encapsulates key strokes with modifiers (`ctrl`, `alt`, `shift`), `matches(pattern)` check, and canonical `to_str()` format (`"ctrl+c"`, `"alt+x"`, `"up"`, etc.).
+  - `TickEvent`: Monotonic timer event carrying `delta_ms` interval for telemetry updates and frame animation.
+  - `ResizeEvent`: Terminal geometry change notifications carrying new `width` and `height`.
+  - `Event`: Unified event wrapper with type discrimination (`EVENT_KEY`, `EVENT_TICK`, `EVENT_RESIZE`), convenience helpers (`is_key()`, `is_ctrl()`, `is_tick()`, `is_resize()`).
+  - `KeyDecoder`: ANSI VT escape sequence parser decoding raw terminal byte streams into typed `KeyEvent`s:
+    - Arrow keys: Up (`\x1b[A`), Down (`\x1b[B`), Right (`\x1b[C`), Left (`\x1b[D`).
+    - Modified keys: Ctrl+Up (`\x1b[1;5A`), Shift+Down (`\x1b[1;2B`), Alt+Key (`\x1b<c>`).
+    - Navigation keys: Home (`\x1b[H`), End (`\x1b[F`), PageUp (`\x1b[5~`), PageDown (`\x1b[6~`), Insert (`\x1b[2~`), Delete (`\x1b[3~`).
+    - Function keys: F1..F4 (SS3 `\x1bOP`..`\x1bOS`), F5..F12 (CSI `\x1b[15~`..`\x1b[24~`).
+    - Control characters: Ctrl+A..Ctrl+Z (`chr(1)`..`chr(26)`), Tab (`\t`), Enter (`\n`/`\r`), Backspace (`\x7f`).
+- **`tui_runtime.nox` — Elm/Bubbletea-style Application Architecture**:
+  - `Frame`: Drawing surface wrapper around `ScreenBuffer`, exposing `size() -> Rect`, `write_string()`, and `fill_rect()`.
+  - `TuiApp`: Base class for interactive terminal applications defining lifecycle hooks:
+    - `init()`: Called before the first frame.
+    - `update(event: Event) -> bool`: State transition function. Returns `True` to keep running, `False` to exit. Handles `q`, `Ctrl+C`, `Esc` by default.
+    - `view(frame: Frame) -> None`: Pure render function drawing UI to the frame.
+  - `AppRunner`: Application execution engine:
+    - `step(event: Event) -> bool`: Dispatches a single event, calls `update()`, renders via `view()`, and flushes diff to terminal.
+    - `run_event_stream(event_list: list[Event]) -> int`: Deterministic headless event runner for automated testing, scripting, and CI environments.
+    - `run_interactive(max_frames: int = -1)`: Interactive loop managing alt-screen buffer (`\x1b[?1049h`), cursor hiding (`\x1b[?25l`), `nox.time` monotonic tick scheduling, and guaranteed cleanup restoration via `driver.restore()`.
+- **Test Suite**:
+  - Added `tests/unit/tui_app_test.nox` (22 passing test suites total).
+- **Example**:
+  - Added `examples/tui_dashboard.nox` demonstrating an interactive full-screen cloud monitor with live telemetry ticks, keyboard navigation, and tab switching.
+
+---
+
 ## [1.3.0] - 2026-10-26
 
 ### Added (Phase 9: Declarative TUI Widgets)

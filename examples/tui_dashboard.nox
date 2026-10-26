@@ -1,0 +1,198 @@
+# examples/tui_dashboard.nox — Interactive, full-screen TUI Dashboard powered by Rune 1.4.0 Event Loop.
+
+import nox.os
+from nox.os import OsError
+import rune
+from rune import Console, Style, Rect, Layout, length_constraint, min_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar, Frame, TuiApp, AppRunner, TerminalDriver, MockTerminalDriver, Event, make_key_event, make_tick_event
+
+class DashboardApp(TuiApp):
+    active_tab: int
+    selected_service: int
+    cpu_pct: int
+    mem_pct: int
+    ticks: int
+    status_msg: str
+
+    def __init__(self: DashboardApp) -> None:
+        self.running = True
+        self.title = "Rune TUI Production Dashboard"
+        self.active_tab = 0
+        self.selected_service = 0
+        self.cpu_pct = 64
+        self.mem_pct = 42
+        self.ticks = 0
+        self.status_msg = "System operating normally"
+
+    def init(self: DashboardApp) -> None:
+        self.cpu_pct = 68
+        self.mem_pct = 45
+        self.status_msg = "Cluster telemetry online"
+
+    def update(self: DashboardApp, ev: Event) -> bool:
+        # 1. Quit shortcuts
+        if ev.is_key("q") or ev.is_ctrl("c") or ev.is_key("esc"):
+            self.running = False
+            return False
+
+        # 2. Navigation
+        if ev.is_key("tab"):
+            self.active_tab = (self.active_tab + 1) % 3
+            self.status_msg = "Switched to tab " + str(self.active_tab)
+        elif ev.is_key("up") or ev.is_key("k"):
+            if self.selected_service > 0:
+                self.selected_service = self.selected_service - 1
+            else:
+                self.selected_service = 4
+        elif ev.is_key("down") or ev.is_key("j"):
+            if self.selected_service < 4:
+                self.selected_service = self.selected_service + 1
+            else:
+                self.selected_service = 0
+
+        # 3. Manual refresh
+        elif ev.is_key("r"):
+            self.cpu_pct = (self.cpu_pct + 7) % 95
+            if self.cpu_pct < 20:
+                self.cpu_pct = 25
+            self.status_msg = "Manual telemetry refresh triggered"
+
+        # 4. Periodic telemetry tick
+        elif ev.is_tick():
+            self.ticks = self.ticks + 1
+            # Slight fluctuation simulation
+            if self.ticks % 2 == 0:
+                self.cpu_pct = self.cpu_pct + 1
+                if self.cpu_pct > 88:
+                    self.cpu_pct = 58
+            else:
+                self.mem_pct = self.mem_pct + 1
+                if self.mem_pct > 75:
+                    self.mem_pct = 40
+
+        return True
+
+    def view(self: DashboardApp, f: Frame) -> None:
+        screen: Rect = f.size()
+        f.fill_rect(0, 0, screen.width, screen.height, " ")
+
+        # Top-level vertical layout: Header (3), Main Body (rest), Footer (1)
+        v_lay: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+        v_lay.add_constraint(length_constraint(3))
+        v_lay.add_constraint(min_constraint(12))
+        v_lay.add_constraint(length_constraint(1))
+
+        chunks: list[Rect] = v_lay.split(screen)
+        header_area: Rect = chunks[0]
+        body_area: Rect = chunks[1]
+        footer_area: Rect = chunks[2]
+
+        # 1. Header with Tabs
+        h_block: Block = Block("Rune 1.4.0 — TUI Cloud Monitor", "left", "rounded", Style("cyan"))
+        h_block.render(header_area, f.buffer)
+        tabs: Tabs = Tabs(["Cluster Overview", "Service Catalog", "System Diagnostics"], self.active_tab, "│")
+        tabs.render(h_block.inner(header_area), f.buffer)
+
+        # 2. Main Body: Split horizontally into Sidebar (24 cols) and Workspace (rest)
+        h_lay: Layout = Layout(DIRECTION_HORIZONTAL, 0, 1)
+        h_lay.add_constraint(length_constraint(24))
+        h_lay.add_constraint(min_constraint(35))
+
+        body_splits: list[Rect] = h_lay.split(body_area)
+        sidebar_area: Rect = body_splits[0]
+        ws_area: Rect = body_splits[1]
+
+        # Sidebar: Service list
+        s_block: Block = Block("Services", "left", "rounded", Style("bright_blue"))
+        s_block.render(sidebar_area, f.buffer)
+        service_list: ListWidget = ListWidget(self.selected_service, "► ", Style("yellow", "", True))
+        service_list.add_item("api-gateway")
+        service_list.add_item("auth-server")
+        service_list.add_item("payment-svc")
+        service_list.add_item("worker-pool")
+        service_list.add_item("db-primary")
+        service_list.render(s_block.inner(sidebar_area), f.buffer)
+
+        # Workspace: Split vertically into Gauges (5 rows) and Table/Details (rest)
+        ws_lay: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+        ws_lay.add_constraint(length_constraint(5))
+        ws_lay.add_constraint(min_constraint(7))
+
+        ws_splits: list[Rect] = ws_lay.split(ws_area)
+        gauge_area: Rect = ws_splits[0]
+        table_area: Rect = ws_splits[1]
+
+        # Gauges
+        g_block: Block = Block("Resource Utilization", "left", "rounded", Style("green"))
+        g_block.render(gauge_area, f.buffer)
+        g_inner: Rect = g_block.inner(gauge_area)
+
+        g_split: Layout = Layout(DIRECTION_VERTICAL, 0, 1)
+        g_split.add_constraint(length_constraint(1))
+        g_split.add_constraint(length_constraint(1))
+        g_panes: list[Rect] = g_split.split(g_inner)
+
+        cpu_st: Style = Style("green", "", True)
+        if self.cpu_pct > 80:
+            cpu_st = Style("red", "", True)
+        elif self.cpu_pct > 60:
+            cpu_st = Style("yellow", "", True)
+
+        Gauge(self.cpu_pct, "CPU: " + str(self.cpu_pct) + "%", Style("white"), cpu_st).render(g_panes[0], f.buffer)
+        Gauge(self.mem_pct, "MEM: " + str(self.mem_pct) + "%", Style("white"), Style("cyan", "", True)).render(g_panes[1], f.buffer)
+
+        # Table
+        t_block: Block = Block("Instance Health", "left", "rounded", Style("magenta"))
+        t_block.render(table_area, f.buffer)
+        tbl: TableWidget = TableWidget(
+            ["Service", "Status", "Latency", "Uptime"],
+            [14, 10, 8, 8],
+            Style("magenta", "", True),
+            Style("white"),
+            Style("yellow", "", True),
+            self.selected_service
+        )
+        tbl.add_row(["api-gateway", "HEALTHY", "12ms", "24d 1h"])
+        tbl.add_row(["auth-server", "HEALTHY", "8ms", "14d 6h"])
+        tbl.add_row(["payment-svc", "HEALTHY", "22ms", "9d 12h"])
+        tbl.add_row(["worker-pool", "BUSY", "140ms", "4d 2h"])
+        tbl.add_row(["db-primary", "HEALTHY", "3ms", "42d 8h"])
+        tbl.render(t_block.inner(table_area), f.buffer)
+
+        # 3. Footer with HelpBar and Status message
+        help_bar: HelpBar = HelpBar(Style("yellow", "", True), Style("bright_black"), "  ")
+        help_bar.add("Tab", "Switch Tab")
+        help_bar.add("↑/↓", "Navigate")
+        help_bar.add("r", "Refresh")
+        help_bar.add("q", "Quit")
+        help_bar.render(footer_area, f.buffer)
+
+con: Console = Console()
+con.print("=== Rune 1.4.0 — TUI Application Runtime & Event Loop Demo ===")
+con.print("")
+
+# Initialize application and mock driver (74 cols x 20 rows)
+app: DashboardApp = DashboardApp()
+driver: MockTerminalDriver = MockTerminalDriver(74, 20, True, True)
+runner: AppRunner = AppRunner(app, driver, 50)
+
+# Simulate event loop stream: Initial load -> Tab -> Down -> Down -> Refresh -> Quit
+events_stream: list[Event] = [
+    make_tick_event(50),
+    make_key_event("tab"),
+    make_key_event("down"),
+    make_key_event("down"),
+    make_key_event("r"),
+    make_key_event("q")
+]
+
+frames: int = runner.run_event_stream(events_stream)
+con.print("Rendered " + str(frames) + " interactive frames successfully.")
+con.print("Final Application State:")
+con.print("  Active Tab:       " + str(app.active_tab))
+con.print("  Selected Service: " + str(app.selected_service))
+con.print("  CPU Utilization:  " + str(app.cpu_pct) + "%")
+con.print("  Memory Usage:     " + str(app.mem_pct) + "%")
+con.print("  Status Message:   " + app.status_msg)
+con.print("")
+con.print("=== Final TUI Screen Capture ===")
+con.print(driver.current_buffer.to_text())

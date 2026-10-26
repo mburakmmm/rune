@@ -20,4 +20,4 @@
 - **v1.1.0 (Phase 7) — TUI Screen Driver & Buffer:** Completed & Published.
 - **v1.2.0 (Phase 8) — Geometry & Flex Layout:** Completed & Published.
 - **v1.3.0 (Phase 9) — Declarative TUI Widgets:** Completed & Published.
-- **v1.4.0 (Phase 10) — Event Loop & Interactive App Runner:** Planned.
+- **v1.4.0 (Phase 10) — Event Loop & Interactive App Runner:** Completed & Published.

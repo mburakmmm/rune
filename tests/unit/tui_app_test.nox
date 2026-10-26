@@ -1,0 +1,160 @@
+# tests/unit/tui_app_test.nox — Comprehensive unit tests for ANSI key decoder, event loop, and TuiApp runtime.
+
+import nox.test
+import core
+from core import Style
+import layout
+from layout import Rect
+import tui
+from tui import ScreenBuffer, MockTerminalDriver
+import events
+from events import Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
+import tui_runtime
+from tui_runtime import Frame, TuiApp, AppRunner
+
+# 1. KeyDecoder Tests
+decoder: KeyDecoder = KeyDecoder()
+
+# Standard characters
+keys_plain: list[KeyEvent] = decoder.decode("abc")
+nox.test.assert_eq_int(len(keys_plain), 3, "three plain keys decoded")
+nox.test.assert_eq_str(keys_plain[0].key, "a", "first key is a")
+nox.test.assert_eq_str(keys_plain[1].key, "b", "second key is b")
+nox.test.assert_eq_str(keys_plain[2].key, "c", "third key is c")
+nox.test.assert_true(not keys_plain[0].ctrl, "not ctrl")
+nox.test.assert_true(not keys_plain[0].alt, "not alt")
+
+ESC: str = chr(27)
+
+# Arrow keys (CSI)
+keys_arrows: list[KeyEvent] = decoder.decode(ESC + "[A" + ESC + "[B" + ESC + "[C" + ESC + "[D")
+nox.test.assert_eq_int(len(keys_arrows), 4, "four arrow keys decoded")
+nox.test.assert_eq_str(keys_arrows[0].key, "up", "arrow up")
+nox.test.assert_eq_str(keys_arrows[1].key, "down", "arrow down")
+nox.test.assert_eq_str(keys_arrows[2].key, "right", "arrow right")
+nox.test.assert_eq_str(keys_arrows[3].key, "left", "arrow left")
+
+# Modified arrow key: Ctrl+Up (\x1b[1;5A)
+keys_mod: list[KeyEvent] = decoder.decode(ESC + "[1;5A")
+nox.test.assert_eq_int(len(keys_mod), 1, "one modified key decoded")
+nox.test.assert_eq_str(keys_mod[0].key, "up", "arrow up")
+nox.test.assert_true(keys_mod[0].ctrl, "ctrl modifier set")
+nox.test.assert_eq_str(keys_mod[0].to_str(), "ctrl+up", "to_str format is ctrl+up")
+
+# Navigation & Tilde keys
+keys_nav: list[KeyEvent] = decoder.decode(ESC + "[H" + ESC + "[F" + ESC + "[5~" + ESC + "[6~" + ESC + "[3~")
+nox.test.assert_eq_int(len(keys_nav), 5, "five nav keys decoded")
+nox.test.assert_eq_str(keys_nav[0].key, "home", "home key")
+nox.test.assert_eq_str(keys_nav[1].key, "end", "end key")
+nox.test.assert_eq_str(keys_nav[2].key, "pageup", "pageup key")
+nox.test.assert_eq_str(keys_nav[3].key, "pagedown", "pagedown key")
+nox.test.assert_eq_str(keys_nav[4].key, "delete", "delete key")
+
+# Function keys (SS3 & CSI)
+keys_fn: list[KeyEvent] = decoder.decode(ESC + "OP" + ESC + "OQ" + ESC + "[15~")
+nox.test.assert_eq_int(len(keys_fn), 3, "three function keys decoded")
+nox.test.assert_eq_str(keys_fn[0].key, "f1", "f1 key")
+nox.test.assert_eq_str(keys_fn[1].key, "f2", "f2 key")
+nox.test.assert_eq_str(keys_fn[2].key, "f5", "f5 key")
+
+# Control Characters: Ctrl+C (chr(3)), Ctrl+D (chr(4)), Tab (\t), Enter (\n), Backspace (chr(127))
+keys_ctrl: list[KeyEvent] = decoder.decode(chr(3) + chr(4) + "\t" + "\n" + chr(127))
+nox.test.assert_eq_int(len(keys_ctrl), 5, "five control keys decoded")
+nox.test.assert_eq_str(keys_ctrl[0].key, "c", "ctrl+c character is c")
+nox.test.assert_true(keys_ctrl[0].ctrl, "ctrl+c ctrl flag")
+nox.test.assert_eq_str(keys_ctrl[0].to_str(), "ctrl+c", "ctrl+c string format")
+nox.test.assert_eq_str(keys_ctrl[1].key, "d", "ctrl+d character is d")
+nox.test.assert_true(keys_ctrl[1].ctrl, "ctrl+d ctrl flag")
+nox.test.assert_eq_str(keys_ctrl[2].key, "tab", "tab key")
+nox.test.assert_eq_str(keys_ctrl[3].key, "enter", "enter key")
+nox.test.assert_eq_str(keys_ctrl[4].key, "backspace", "backspace key")
+
+# Alt combination: ESC + "x"
+keys_alt: list[KeyEvent] = decoder.decode(ESC + "x")
+nox.test.assert_eq_int(len(keys_alt), 1, "alt key decoded")
+nox.test.assert_eq_str(keys_alt[0].key, "x", "alt key is x")
+nox.test.assert_true(keys_alt[0].alt, "alt modifier set")
+nox.test.assert_eq_str(keys_alt[0].to_str(), "alt+x", "alt+x string format")
+
+# Standalone Esc
+keys_esc: list[KeyEvent] = decoder.decode(ESC)
+nox.test.assert_eq_int(len(keys_esc), 1, "standalone esc decoded")
+nox.test.assert_eq_str(keys_esc[0].key, "esc", "esc key")
+
+# 2. Event Model Tests
+ev_k: Event = make_key_event("q")
+nox.test.assert_true(ev_k.is_key("q"), "matches key q")
+nox.test.assert_true(ev_k.is_key("Q"), "case-insensitive match for Q")
+nox.test.assert_true(not ev_k.is_ctrl(), "not a ctrl event")
+nox.test.assert_true(not ev_k.is_tick(), "not a tick event")
+nox.test.assert_true(not ev_k.is_resize(), "not a resize event")
+
+ev_ctrl_c: Event = make_key_event("c", True)
+nox.test.assert_true(ev_ctrl_c.is_ctrl("c"), "matches ctrl+c")
+nox.test.assert_eq_str(ev_ctrl_c.key_str(), "ctrl+c", "key_str is ctrl+c")
+
+ev_tick: Event = make_tick_event(33)
+nox.test.assert_true(ev_tick.is_tick(), "is a tick event")
+nox.test.assert_eq_int(ev_tick.delta_ms, 33, "tick delta is 33ms")
+
+ev_resize: Event = make_resize_event(120, 40)
+nox.test.assert_true(ev_resize.is_resize(), "is a resize event")
+nox.test.assert_eq_int(ev_resize.width, 120, "resize width is 120")
+nox.test.assert_eq_int(ev_resize.height, 40, "resize height is 40")
+
+# 3. Frame Tests
+buf: ScreenBuffer = ScreenBuffer(40, 10)
+frame: Frame = Frame(buf)
+nox.test.assert_eq_int(frame.size().width, 40, "frame width is 40")
+nox.test.assert_eq_int(frame.size().height, 10, "frame height is 10")
+frame.write_string(5, 2, "Test Frame")
+nox.test.assert_eq_str(buf.get(5, 2).char, "T", "written to underlying buffer")
+
+# 4. TuiApp & AppRunner Integration Test
+class CounterApp(TuiApp):
+    count: int
+
+    def __init__(self: CounterApp) -> None:
+        self.running = True
+        self.title = "Counter App"
+        self.count = 0
+
+    def init(self: CounterApp) -> None:
+        self.count = 10
+
+    def update(self: CounterApp, ev: Event) -> bool:
+        if ev.is_key("q") or ev.is_ctrl("c") or ev.is_key("esc"):
+            self.running = False
+            return False
+        if ev.is_key("up") or ev.is_key("+"):
+            self.count = self.count + 1
+        elif ev.is_key("down") or ev.is_key("-"):
+            self.count = self.count - 1
+        return True
+
+    def view(self: CounterApp, f: Frame) -> None:
+        f.fill_rect(0, 0, f.width, f.height, " ")
+        f.write_string(0, 0, "Count: " + str(self.count))
+
+mock_driver: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+counter_app: CounterApp = CounterApp()
+runner: AppRunner = AppRunner(counter_app, mock_driver, 50)
+
+# Simulate event stream
+event_stream: list[Event] = [
+    make_key_event("up"),    # 10 -> 11
+    make_key_event("up"),    # 11 -> 12
+    make_key_event("down"),  # 12 -> 11
+    make_key_event("q")      # Exit
+]
+
+frames_run: int = runner.run_event_stream(event_stream)
+nox.test.assert_eq_int(counter_app.count, 11, "counter updated to 11")
+nox.test.assert_true(not counter_app.running, "app stopped running on 'q'")
+nox.test.assert_true(frames_run >= 4, "at least 4 frames rendered")
+
+# Check buffer text reflects final count
+buf_txt: str = mock_driver.current_buffer.to_text()
+nox.test.assert_eq_str(buf_txt[0:9], "Count: 11", "buffer snapshot contains final count")
+
+print("tui_app_test passed")

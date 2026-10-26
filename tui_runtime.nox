@@ -1,0 +1,128 @@
+# tui_runtime.nox — TUI Application runtime, Elm/Bubbletea-style update/view architecture, and frame loop.
+
+import nox.time
+import core
+from core import Style
+import layout
+from layout import Rect
+import tui
+from tui import ScreenBuffer, TerminalDriver
+import events
+from events import Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
+
+class Frame:
+    buffer: ScreenBuffer
+    width: int
+    height: int
+
+    def __init__(self: Frame, buffer: ScreenBuffer) -> None:
+        self.buffer = buffer
+        self.width = buffer.width
+        self.height = buffer.height
+
+    def size(self: Frame) -> Rect:
+        return Rect(0, 0, self.width, self.height)
+
+    def write_string(self: Frame, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
+        return self.buffer.write_string(x, y, text, style, max_width)
+
+    def fill_rect(self: Frame, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
+        self.buffer.fill_rect(x, y, w, h, char, style)
+
+class TuiApp:
+    running: bool
+    title: str
+
+    def __init__(self: TuiApp, title: str = "Rune TUI Application") -> None:
+        self.running = True
+        self.title = title
+
+    def init(self: TuiApp) -> None:
+        pass
+
+    def update(self: TuiApp, event: Event) -> bool:
+        if event.is_key("q") or event.is_ctrl("c") or event.is_key("esc"):
+            self.running = False
+            return False
+        return True
+
+    def view(self: TuiApp, frame: Frame) -> None:
+        pass
+
+class AppRunner:
+    app: TuiApp
+    driver: TerminalDriver
+    tick_rate_ms: int
+    frame_count: int
+    decoder: KeyDecoder
+
+    def __init__(
+        self: AppRunner,
+        app: TuiApp,
+        driver: TerminalDriver | None = None,
+        tick_rate_ms: int = 100
+    ) -> None:
+        self.app = app
+        if driver != None:
+            self.driver = driver
+        else:
+            self.driver = TerminalDriver()
+        if tick_rate_ms < 10:
+            tick_rate_ms = 10
+        self.tick_rate_ms = tick_rate_ms
+        self.frame_count = 0
+        self.decoder = KeyDecoder()
+
+    def step(self: AppRunner, event: Event) -> bool:
+        keep: bool = self.app.update(event)
+        if not keep:
+            self.app.running = False
+            return False
+        frame: Frame = Frame(self.driver.current_buffer)
+        self.app.view(frame)
+        self.driver.flush()
+        self.frame_count = self.frame_count + 1
+        return True
+
+    def run_event_stream(self: AppRunner, event_list: list[Event]) -> int:
+        self.app.init()
+        # Initial render
+        frame: Frame = Frame(self.driver.current_buffer)
+        self.app.view(frame)
+        self.driver.flush()
+        self.frame_count = self.frame_count + 1
+
+        i: int = 0
+        n: int = len(event_list)
+        while i < n and self.app.running:
+            ev: Event = event_list[i]
+            res: bool = self.step(ev)
+            if not res:
+                break
+            i = i + 1
+        return self.frame_count
+
+    def run_interactive(self: AppRunner, max_frames: int = -1) -> None:
+        # 1. Setup terminal environment
+        self.driver.enter_alt_screen()
+        self.driver.hide_cursor()
+        self.app.init()
+
+        # Initial frame
+        frame: Frame = Frame(self.driver.current_buffer)
+        self.app.view(frame)
+        self.driver.flush()
+        self.frame_count = self.frame_count + 1
+
+        # 2. Main loop
+        while self.app.running:
+            if max_frames >= 0 and self.frame_count >= max_frames:
+                break
+            # Tick sleep
+            nox.time.sleep_ms(self.tick_rate_ms)
+            step_res: bool = self.step(make_tick_event(self.tick_rate_ms))
+            if not step_res:
+                break
+
+        # 3. Always restore terminal state cleanly
+        self.driver.restore()
