@@ -49,4 +49,4 @@ import completion
 from completion import generate_completion, generate_bash_completion, generate_zsh_completion, generate_fish_completion
 
 import tui
-from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver
+from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver, Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL

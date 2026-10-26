@@ -25,7 +25,7 @@
 | **Phase 6: Rune 1.0 Release** | `v1.0.0` | Public API freeze, complete documentation, release gates | **Completed** | Full Suite (17 suites) |
 | **Phase 6.1: Security & Unicode** | `v1.0.1` | \r line spoofing fix, C1 stripping, cell_width wcwidth, CI prompts | **Completed** | `security_hardening_test` (18 suites) |
 | **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Completed** | `tui_buffer_test` (19 suites) |
-| **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Planned** | `tui_layout_test` |
+| **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Completed** | `tui_layout_test` (20 suites) |
 | **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Planned** | `tui_widgets_test` |
 | **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Planned** | `tui_app_test` |
 
@@ -294,22 +294,24 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📐 v1.2.0 — Phase 8: Geometry & Flex Layout Engine (Planned)
+### 📐 v1.2.0 — Phase 8: Geometry & Flex Layout Engine (Completed)
 **Goal:** Provide a flexible bounding-box and constraint-based layout engine inspired by Ratatui / CSS Flexbox.
 
-- [ ] **Rectangular Geometry (`Rect`)**:
+- [x] **Rectangular Geometry (`Rect`)**:
   - `Rect(x: int, y: int, width: int, height: int)`.
-  - Intersection, containment, padding, and inner margin helpers (`rect.inner(margin)`).
-- [ ] **Layout Constraints (`Constraint`)**:
-  - `Length(n)`: fixed cell dimension.
-  - `Percentage(p)`: percentage of parent container.
-  - `Ratio(num, den)`: exact fractional width/height.
-  - `Min(n)` / `Max(n)`: bounded dynamic dimensions.
-- [ ] **Flex Layout Solver (`Layout`)**:
-  - Direction support: `Direction.Horizontal` and `Direction.Vertical`.
-  - Margin & spacing distribution between split chunks.
+  - Intersection, containment, padding, and inner margin helpers (`rect.inner(margin)`, `rect.inner_xy(mx, my)`).
+  - Area, empty checks, and bounding union calculations.
+- [x] **Layout Constraints (`Constraint`)**:
+  - `length_constraint(n)`: fixed cell dimension.
+  - `percentage_constraint(p)`: percentage of parent container (0..100%).
+  - `ratio_constraint(num, den)`: exact fractional width/height.
+  - `min_constraint(n)` / `max_constraint(n)`: bounded dynamic dimensions.
+- [x] **Flex Layout Solver (`Layout`)**:
+  - Direction support: `DIRECTION_HORIZONTAL` and `DIRECTION_VERTICAL`.
+  - Margin & spacing distribution between split chunks (`set_margin()`, `set_spacing()`).
   - Deterministic integer coordinate rounding without pixel/cell gaps.
-  - Comprehensive unit tests covering 2-column, 3-row, and nested grid layouts.
+  - Comprehensive unit tests covering 2-column, 3-row, and nested grid layouts (`tests/unit/tui_layout_test.nox`).
+  - Example in `examples/tui_layout_demo.nox`.
 
 ---
 

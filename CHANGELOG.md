@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-10-26
+
+### Added (Phase 8: Geometry & Flex Layout Engine)
+- **`Rect` Class (`rune.tui`)**:
+  - 2D rectangular bounding box representing terminal UI coordinates: `Rect(x, y, width, height)`.
+  - Methods: `area()`, `is_empty()`, `contains(px, py)`.
+  - Margin helpers: `inner(margin)` for uniform margin inset and `inner_xy(margin_x, margin_y)` for differential margin insets.
+  - Set geometry: `intersection(other)` for finding overlapping areas and `union(other)` for computing bounding boxes.
+- **`Constraint` Class & Helpers**:
+  - `length_constraint(n)`: fixed cell dimension (e.g. 3 rows for a header).
+  - `percentage_constraint(p)`: percentage of parent available size (0%..100%).
+  - `ratio_constraint(num, den)`: exact fractional width/height allocation.
+  - `min_constraint(n)`: flexible dimension with minimum size guarantee.
+  - `max_constraint(n)`: flexible dimension with maximum size cap.
+- **`Layout` Class**:
+  - Flex constraint solver dividing parent `Rect` into child chunks along `DIRECTION_VERTICAL` or `DIRECTION_HORIZONTAL`.
+  - Automatic margin inset and inter-chunk spacing (`set_margin()`, `set_spacing()`).
+  - Deterministic remainder distribution: eliminates 1-cell rounding errors and pixel/cell gaps.
+  - Handles nested layouts (grids, matrices, split sidebars, multi-column dashboards).
+- **Test Suite**:
+  - Added `tests/unit/tui_layout_test.nox` (20 passing test suites total).
+- **Example**:
+  - Added `examples/tui_layout_demo.nox` demonstrating nested multi-pane grid layout.
+
+---
+
 ## [1.1.0] - 2026-10-26
 
 ### Added (Phase 7: Terminal Screen Driver & Virtual Buffer)

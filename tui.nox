@@ -2,6 +2,8 @@
 
 import nox.strings
 from core import Style, ConsoleOptions, detect_console_options, esc_code, reset_code, char_width, strip_ansi
+import layout
+from layout import Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, CONSTRAINT_LENGTH, CONSTRAINT_PERCENTAGE, CONSTRAINT_RATIO, CONSTRAINT_MIN, CONSTRAINT_MAX
 
 class Cell:
     char: str

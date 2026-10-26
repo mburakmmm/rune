@@ -1,0 +1,160 @@
+# tests/unit/tui_layout_test.nox — Unit tests for Rect geometry, Constraint types, and Flex Layout engine.
+
+import nox.test
+import layout
+from layout import Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL
+
+# 1. Rect Basics
+r1: Rect = Rect(10, 5, 40, 20)
+nox.test.assert_eq_int(r1.x, 10, "rect x should be 10")
+nox.test.assert_eq_int(r1.y, 5, "rect y should be 5")
+nox.test.assert_eq_int(r1.width, 40, "rect width should be 40")
+nox.test.assert_eq_int(r1.height, 20, "rect height should be 20")
+nox.test.assert_eq_int(r1.area(), 800, "rect area should be 800")
+nox.test.assert_true(not r1.is_empty(), "rect should not be empty")
+
+# Clamping negative dimensions
+r_neg: Rect = Rect(0, 0, -10, -5)
+nox.test.assert_eq_int(r_neg.width, 0, "negative width clamped to 0")
+nox.test.assert_eq_int(r_neg.height, 0, "negative height clamped to 0")
+nox.test.assert_true(r_neg.is_empty(), "zero dimension rect is empty")
+
+# Point containment
+nox.test.assert_true(r1.contains(10, 5), "contains top-left corner")
+nox.test.assert_true(r1.contains(49, 24), "contains bottom-right inner point")
+nox.test.assert_true(not r1.contains(50, 25), "does not contain outer point")
+nox.test.assert_true(not r1.contains(9, 5), "does not contain point left of rect")
+
+# Inner margins
+r_in: Rect = r1.inner(2)
+nox.test.assert_eq_int(r_in.x, 12, "inner x inset by 2")
+nox.test.assert_eq_int(r_in.y, 7, "inner y inset by 2")
+nox.test.assert_eq_int(r_in.width, 36, "inner width reduced by 4")
+nox.test.assert_eq_int(r_in.height, 16, "inner height reduced by 4")
+
+r_in_xy: Rect = r1.inner_xy(5, 2)
+nox.test.assert_eq_int(r_in_xy.x, 15, "inner_xy x inset by 5")
+nox.test.assert_eq_int(r_in_xy.y, 7, "inner_xy y inset by 2")
+nox.test.assert_eq_int(r_in_xy.width, 30, "inner_xy width reduced by 10")
+nox.test.assert_eq_int(r_in_xy.height, 16, "inner_xy height reduced by 4")
+
+# Intersection
+r_a: Rect = Rect(0, 0, 20, 20)
+r_b: Rect = Rect(10, 10, 20, 20)
+inter: Rect = r_a.intersection(r_b)
+nox.test.assert_eq_int(inter.x, 10, "intersection x is 10")
+nox.test.assert_eq_int(inter.y, 10, "intersection y is 10")
+nox.test.assert_eq_int(inter.width, 10, "intersection width is 10")
+nox.test.assert_eq_int(inter.height, 10, "intersection height is 10")
+
+# Disjoint intersection
+r_c: Rect = Rect(100, 100, 10, 10)
+inter_none: Rect = r_a.intersection(r_c)
+nox.test.assert_true(inter_none.is_empty(), "disjoint rects have empty intersection")
+
+# Union
+un: Rect = r_a.union(r_b)
+nox.test.assert_eq_int(un.x, 0, "union x is 0")
+nox.test.assert_eq_int(un.y, 0, "union y is 0")
+nox.test.assert_eq_int(un.width, 30, "union width is 30")
+nox.test.assert_eq_int(un.height, 30, "union height is 30")
+
+# 2. Vertical 3-Row Layout
+lay_v: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+lay_v.add_constraint(length_constraint(3))  # header
+lay_v.add_constraint(min_constraint(10))  # flexible body
+lay_v.add_constraint(length_constraint(1))  # footer
+
+v_chunks: list[Rect] = lay_v.split(Rect(0, 0, 80, 24))
+nox.test.assert_eq_int(len(v_chunks), 3, "should produce 3 vertical chunks")
+
+# Header chunk
+nox.test.assert_eq_int(v_chunks[0].x, 0, "header x 0")
+nox.test.assert_eq_int(v_chunks[0].y, 0, "header y 0")
+nox.test.assert_eq_int(v_chunks[0].width, 80, "header width 80")
+nox.test.assert_eq_int(v_chunks[0].height, 3, "header height 3")
+
+# Body chunk takes remaining 20 rows (24 - 3 - 1)
+nox.test.assert_eq_int(v_chunks[1].x, 0, "body x 0")
+nox.test.assert_eq_int(v_chunks[1].y, 3, "body y 3")
+nox.test.assert_eq_int(v_chunks[1].width, 80, "body width 80")
+nox.test.assert_eq_int(v_chunks[1].height, 20, "body height 20")
+
+# Footer chunk
+nox.test.assert_eq_int(v_chunks[2].x, 0, "footer x 0")
+nox.test.assert_eq_int(v_chunks[2].y, 23, "footer y 23")
+nox.test.assert_eq_int(v_chunks[2].width, 80, "footer width 80")
+nox.test.assert_eq_int(v_chunks[2].height, 1, "footer height 1")
+
+# Total height check: zero gaps
+total_h: int = v_chunks[0].height + v_chunks[1].height + v_chunks[2].height
+nox.test.assert_eq_int(total_h, 24, "sum of chunk heights matches parent height")
+
+# 3. Horizontal Split with Percentages, Margins and Spacing
+lay_h: Layout = Layout(DIRECTION_HORIZONTAL, 1, 2)
+lay_h.add_constraint(percentage_constraint(30))
+lay_h.add_constraint(percentage_constraint(70))
+
+h_chunks: list[Rect] = lay_h.split(Rect(0, 0, 100, 30))
+nox.test.assert_eq_int(len(h_chunks), 2, "should produce 2 horizontal chunks")
+
+# Usable width: 100 - (2 * 1 margin) - 2 spacing = 96
+# 30% of 96 = 28. Remainder assigned to chunk 1 = 68.
+nox.test.assert_eq_int(h_chunks[0].x, 1, "chunk 0 starts at x=1 (margin)")
+nox.test.assert_eq_int(h_chunks[0].y, 1, "chunk 0 starts at y=1 (margin)")
+nox.test.assert_eq_int(h_chunks[0].width, 28, "chunk 0 width is 28")
+nox.test.assert_eq_int(h_chunks[0].height, 28, "chunk 0 height is 28")
+
+# Chunk 1 starts after chunk 0 + 2 spacing = 1 + 28 + 2 = 31
+nox.test.assert_eq_int(h_chunks[1].x, 31, "chunk 1 starts at x=31")
+nox.test.assert_eq_int(h_chunks[1].width, 68, "chunk 1 width is 68")
+nox.test.assert_eq_int(h_chunks[1].height, 28, "chunk 1 height is 28")
+
+# Exact spacing gap verification
+gap: int = h_chunks[1].x - (h_chunks[0].x + h_chunks[0].width)
+nox.test.assert_eq_int(gap, 2, "exact spacing gap of 2 between chunks")
+
+# 4. Nested Grid Layout (Dashboard Matrix)
+# Top-level vertical split: Header (3), Main (18), Footer (1)
+dashboard_area: Rect = Rect(0, 0, 80, 22)
+screen_lay: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+screen_lay.add_constraint(length_constraint(3))
+screen_lay.add_constraint(length_constraint(18))
+screen_lay.add_constraint(length_constraint(1))
+
+screen_chunks: list[Rect] = screen_lay.split(dashboard_area)
+main_area: Rect = screen_chunks[1]
+
+# Subdivide Main area into Sidebar (20 width) and Content (rest)
+main_lay: Layout = Layout(DIRECTION_HORIZONTAL, 0, 1)  # 1 cell spacing between panes
+main_lay.add_constraint(length_constraint(20))
+main_lay.add_constraint(min_constraint(30))
+
+panes: list[Rect] = main_lay.split(main_area)
+nox.test.assert_eq_int(len(panes), 2, "nested main area produces 2 panes")
+nox.test.assert_eq_int(panes[0].x, 0, "sidebar pane starts at x=0")
+nox.test.assert_eq_int(panes[0].y, 3, "sidebar pane starts at y=3")
+nox.test.assert_eq_int(panes[0].width, 20, "sidebar width is 20")
+nox.test.assert_eq_int(panes[0].height, 18, "sidebar height is 18")
+
+nox.test.assert_eq_int(panes[1].x, 21, "content pane starts at x=21 (after spacing)")
+nox.test.assert_eq_int(panes[1].y, 3, "content pane starts at y=3")
+# Total width 80 - 20 (sidebar) - 1 (spacing) = 59
+nox.test.assert_eq_int(panes[1].width, 59, "content width is 59")
+nox.test.assert_eq_int(panes[1].height, 18, "content height is 18")
+
+# 5. Empty and Overallocation Safety
+lay_empty: Layout = Layout()
+empty_res: list[Rect] = lay_empty.split(dashboard_area)
+nox.test.assert_eq_int(len(empty_res), 0, "empty layout returns empty list")
+
+# Overallocation: total length 100 on height 20
+lay_over: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+lay_over.add_constraint(length_constraint(50))
+lay_over.add_constraint(length_constraint(50))
+over_chunks: list[Rect] = lay_over.split(Rect(0, 0, 40, 20))
+nox.test.assert_eq_int(len(over_chunks), 2, "overallocated layout returns requested count")
+total_over_h: int = over_chunks[0].height + over_chunks[1].height
+nox.test.assert_eq_int(total_over_h, 20, "overallocated sum clamped to available dimension")
+
+print("tui_layout_test passed")

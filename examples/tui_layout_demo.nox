@@ -1,0 +1,77 @@
+# tui_layout_demo.nox — Flex layout solver and Rect geometry demonstration for Rune TUI.
+
+import rune
+from rune import Console, Style, TerminalDriver, MockTerminalDriver, Rect, Layout, length_constraint, percentage_constraint, min_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL
+
+con: Console = Console()
+
+con.print("=== Rune 1.2.0 — TUI Geometry & Flex Layout Engine Demo ===")
+con.print("")
+
+# Initialize a mock driver representing a 70x16 terminal
+driver: MockTerminalDriver = MockTerminalDriver(70, 16, True, True)
+
+# Define screen boundaries
+screen: Rect = Rect(0, 0, 70, 16)
+
+# 1. Top-level vertical split: Header (3), Main (11), Footer (2)
+v_lay: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+v_lay.add_constraint(length_constraint(3))
+v_lay.add_constraint(min_constraint(8))
+v_lay.add_constraint(length_constraint(2))
+
+chunks: list[Rect] = v_lay.split(screen)
+header_rect: Rect = chunks[0]
+main_rect: Rect = chunks[1]
+footer_rect: Rect = chunks[2]
+
+# 2. Split Main area horizontally: Sidebar (20 cols), Workspace (rest) with 1 col spacing
+h_lay: Layout = Layout(DIRECTION_HORIZONTAL, 0, 1)
+h_lay.add_constraint(length_constraint(20))
+h_lay.add_constraint(min_constraint(30))
+
+main_panes: list[Rect] = h_lay.split(main_rect)
+sidebar_rect: Rect = main_panes[0]
+workspace_rect: Rect = main_panes[1]
+
+# 3. Draw Header pane
+st_cyan: Style = Style("cyan", "", True)
+st_green: Style = Style("green", "", True)
+st_dim: Style = Style("bright_black")
+
+driver.fill_rect(header_rect.x, header_rect.y, header_rect.width, 1, "─", st_cyan)
+driver.draw_string(header_rect.x + 2, header_rect.y, " Rune TUI Studio — Dashboard ", Style("yellow", "", True))
+driver.draw_string(header_rect.x + 2, header_rect.y + 1, "Active Project: nox-packages/rune (v1.2.0)", Style("white"))
+driver.fill_rect(header_rect.x, header_rect.y + 2, header_rect.width, 1, "─", st_cyan)
+
+# 4. Draw Sidebar pane
+driver.fill_rect(sidebar_rect.x, sidebar_rect.y, 1, sidebar_rect.height, "│", st_cyan)
+driver.draw_string(sidebar_rect.x + 2, sidebar_rect.y, "Navigation", st_green)
+driver.draw_string(sidebar_rect.x + 2, sidebar_rect.y + 2, "► Overview", Style("bright_blue", "", True))
+driver.draw_string(sidebar_rect.x + 2, sidebar_rect.y + 3, "  Telemetry", st_dim)
+driver.draw_string(sidebar_rect.x + 2, sidebar_rect.y + 4, "  Services", st_dim)
+driver.draw_string(sidebar_rect.x + 2, sidebar_rect.y + 5, "  Settings", st_dim)
+driver.fill_rect(sidebar_rect.x + sidebar_rect.width - 1, sidebar_rect.y, 1, sidebar_rect.height, "│", st_cyan)
+
+# 5. Draw Workspace pane
+driver.fill_rect(workspace_rect.x, workspace_rect.y, 1, workspace_rect.height, "│", st_cyan)
+driver.draw_string(workspace_rect.x + 2, workspace_rect.y, "Cluster Health Metrics", st_green)
+driver.draw_string(workspace_rect.x + 2, workspace_rect.y + 2, "Node-01: [ONLINE]  Latency: 1.2ms  Load: 0.24", Style("white"))
+driver.draw_string(workspace_rect.x + 2, workspace_rect.y + 3, "Node-02: [ONLINE]  Latency: 0.9ms  Load: 0.18", Style("white"))
+driver.draw_string(workspace_rect.x + 2, workspace_rect.y + 4, "Node-03: [ONLINE]  Latency: 2.1ms  Load: 0.42", Style("white"))
+driver.fill_rect(workspace_rect.x + workspace_rect.width - 1, workspace_rect.y, 1, workspace_rect.height, "│", st_cyan)
+
+# 6. Draw Footer pane
+driver.fill_rect(footer_rect.x, footer_rect.y, footer_rect.width, 1, "─", st_cyan)
+driver.draw_string(footer_rect.x + 2, footer_rect.y + 1, "[q] Exit   [Tab] Switch Pane   [↑/↓] Select Item", st_dim)
+
+# Flush diff
+diff: str = driver.flush()
+
+con.print("Header Rect:    " + str(header_rect.x) + "," + str(header_rect.y) + " (" + str(header_rect.width) + "x" + str(header_rect.height) + ")")
+con.print("Sidebar Rect:   " + str(sidebar_rect.x) + "," + str(sidebar_rect.y) + " (" + str(sidebar_rect.width) + "x" + str(sidebar_rect.height) + ")")
+con.print("Workspace Rect: " + str(workspace_rect.x) + "," + str(workspace_rect.y) + " (" + str(workspace_rect.width) + "x" + str(workspace_rect.height) + ")")
+con.print("Footer Rect:    " + str(footer_rect.x) + "," + str(footer_rect.y) + " (" + str(footer_rect.width) + "x" + str(footer_rect.height) + ")")
+con.print("")
+con.print("Layout rendered cleanly with " + str(len(diff)) + " bytes of flicker-free ANSI output.")
+con.print("")
