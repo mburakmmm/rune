@@ -195,6 +195,10 @@ Options:
 
 ---
 
+## Nox Compiler & Runtime Integration
+
+For a comprehensive systems-level specification and Zig runtime implementation plan to bridge Rune with live terminal raw mode, non-blocking input, and window resize events in the Nox compiler runtime, see [NOX_LIMITATIONS.md](NOX_LIMITATIONS.md).
+
 ## Security Model
 
 - **ANSI Sanitization**: All untrusted terminal output can be sanitized using `sanitize_ansi()`, stripping terminal titles (OSC), cursor positioning (CSI), and clipboard manipulation sequences.

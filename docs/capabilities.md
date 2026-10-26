@@ -27,6 +27,9 @@ This document audits the capabilities of the Nox runtime (`noxc 2.0.27`, `noxrt.
 
 ## 2. Terminal Detection & Fallback Policy
 
+> [!NOTE]
+> For a detailed, systems-level specification and Zig runtime implementation plan to add missing terminal primitives (`termios` raw mode, `isatty`, non-blocking input, `TIOCGWINSZ`), see [NOX_LIMITATIONS.md](../NOX_LIMITATIONS.md).
+
 Since direct file descriptor inspection (`isatty`) is not currently exposed by Nox stdlib:
 1. Rune provides explicit, deterministic capability configuration through `ConsoleOptions`.
 2. Environment conventions are respected in order of strict precedence:
