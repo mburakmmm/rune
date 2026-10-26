@@ -4,6 +4,8 @@ import nox.strings
 from core import Style, ConsoleOptions, detect_console_options, esc_code, reset_code, char_width, strip_ansi
 import layout
 from layout import Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, CONSTRAINT_LENGTH, CONSTRAINT_PERCENTAGE, CONSTRAINT_RATIO, CONSTRAINT_MIN, CONSTRAINT_MAX
+import widgets
+from widgets import Block, Paragraph, Gauge, Tabs, ListItem, ListWidget, TableWidget, HelpBar
 
 class Cell:
     char: str
@@ -200,6 +202,21 @@ class ScreenBuffer:
         self.width = new_w
         self.height = new_h
         self.cells = new_cells
+
+    def to_text(self: ScreenBuffer) -> str:
+        lines: list[str] = []
+        y: int = 0
+        while y < self.height:
+            line: str = ""
+            x: int = 0
+            while x < self.width:
+                c: Cell = self.get(x, y)
+                if c.width > 0:
+                    line = line + c.char
+                x = x + 1
+            lines.append(line)
+            y = y + 1
+        return nox.strings.join(lines, "\n")
 
 class TerminalDriver:
     options: ConsoleOptions

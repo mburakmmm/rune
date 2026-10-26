@@ -188,6 +188,7 @@ Options:
 | **TUI** | Cursor Control & Restoration | **Supported** | Hide/show, direct positioning, cleanup |
 | **TUI** | Rect Geometry & Insets | **Supported** | 2D coordinates, area, inner margins, union, intersection |
 | **TUI** | Flex Layout Solver | **Supported** | Length, Percentage, Ratio, Min, Max constraints |
+| **TUI** | Declarative Widgets | **Supported** | Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar |
 
 ---
 

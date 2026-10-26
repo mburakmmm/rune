@@ -1,0 +1,471 @@
+# widgets.nox — Declarative TUI widgets for Rune: Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar.
+
+import nox.strings
+import core
+from core import Style, cell_width, wrap_text
+import layout
+from layout import Rect
+import tui
+from tui import Cell, ScreenBuffer
+
+class Block:
+    title: str
+    title_alignment: str
+    border_type: str
+    border_style: Style
+    title_style: Style
+
+    def __init__(self: Block, title: str = "", title_alignment: str = "left", border_type: str = "rounded", border_style: Style | None = None, title_style: Style | None = None) -> None:
+        self.title = title
+        self.title_alignment = title_alignment
+        self.border_type = border_type
+        if border_style != None:
+            self.border_style = border_style
+        else:
+            self.border_style = Style()
+        if title_style != None:
+            self.title_style = title_style
+        else:
+            self.title_style = Style()
+
+    def inner(self: Block, area: Rect) -> Rect:
+
+        if self.border_type == "none":
+            return Rect(area.x, area.y, area.width, area.height)
+        return area.inner(1)
+
+    def render(self: Block, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty():
+            return
+        if self.border_type == "none":
+            return
+
+        c_tl: str = "╭"
+        c_tr: str = "╮"
+        c_bl: str = "╰"
+        c_br: str = "╯"
+        c_h: str = "─"
+        c_v: str = "│"
+
+        if self.border_type == "square":
+            c_tl = "┌"
+            c_tr = "┐"
+            c_bl = "└"
+            c_br = "┘"
+        elif self.border_type == "double":
+            c_tl = "╔"
+            c_tr = "╗"
+            c_bl = "╚"
+            c_br = "╝"
+            c_h = "═"
+            c_v = "║"
+        elif self.border_type == "ascii":
+            c_tl = "+"
+            c_tr = "+"
+            c_bl = "+"
+            c_br = "+"
+            c_h = "-"
+            c_v = "|"
+
+        # Draw top border
+        buf.set(area.x, area.y, c_tl, self.border_style)
+        x: int = area.x + 1
+        while x < area.x + area.width - 1:
+            buf.set(x, area.y, c_h, self.border_style)
+            x = x + 1
+        if area.width > 1:
+            buf.set(area.x + area.width - 1, area.y, c_tr, self.border_style)
+
+        # Draw side borders
+        y: int = area.y + 1
+        while y < area.y + area.height - 1:
+            buf.set(area.x, y, c_v, self.border_style)
+            if area.width > 1:
+                buf.set(area.x + area.width - 1, y, c_v, self.border_style)
+            y = y + 1
+
+        # Draw bottom border
+        if area.height > 1:
+            buf.set(area.x, area.y + area.height - 1, c_bl, self.border_style)
+            x = area.x + 1
+            while x < area.x + area.width - 1:
+                buf.set(x, area.y + area.height - 1, c_h, self.border_style)
+                x = x + 1
+            if area.width > 1:
+                buf.set(area.x + area.width - 1, area.y + area.height - 1, c_br, self.border_style)
+
+        # Draw Title
+        if len(self.title) > 0 and area.width > 4:
+            t_str: str = " " + self.title + " "
+            t_len: int = cell_width(t_str)
+            t_x: int = area.x + 2
+            if self.title_alignment == "center":
+                t_x = area.x + (area.width - t_len) // 2
+            elif self.title_alignment == "right":
+                t_x = area.x + area.width - t_len - 2
+            if t_x < area.x + 1:
+                t_x = area.x + 1
+            buf.write_string(t_x, area.y, t_str, self.title_style, area.width - 2)
+
+class Paragraph:
+    text: str
+    style: Style
+    wrap: bool
+    scroll: int
+    alignment: str
+
+    def __init__(self: Paragraph, text: str = "", style: Style | None = None, wrap: bool = True, scroll: int = 0, alignment: str = "left") -> None:
+        self.text = text
+        if style != None:
+            self.style = style
+        else:
+            self.style = Style()
+        self.wrap = wrap
+        if scroll < 0:
+            scroll = 0
+        self.scroll = scroll
+        self.alignment = alignment
+
+    def render(self: Paragraph, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty():
+            return
+        lines: list[str] = []
+        if self.wrap:
+            lines = wrap_text(self.text, area.width)
+        else:
+            lines = nox.strings.split(self.text, "\n")
+
+        line_idx: int = self.scroll
+        row: int = area.y
+        while line_idx < len(lines) and row < area.y + area.height:
+            line_str: str = lines[line_idx]
+            lw: int = cell_width(line_str)
+            col: int = area.x
+            if self.alignment == "center":
+                col = area.x + (area.width - lw) // 2
+            elif self.alignment == "right":
+                col = area.x + area.width - lw
+            if col < area.x:
+                col = area.x
+            buf.write_string(col, row, line_str, self.style, area.width)
+            row = row + 1
+            line_idx = line_idx + 1
+
+class Gauge:
+    percentage: int
+    label: str
+    style: Style
+    gauge_style: Style
+    track_style: Style
+    fill_char: str
+    track_char: str
+
+    def __init__(self: Gauge, percentage: int = 0, label: str = "", style: Style | None = None, gauge_style: Style | None = None, track_style: Style | None = None, fill_char: str = "█", track_char: str = "─") -> None:
+        if percentage < 0:
+            percentage = 0
+        if percentage > 100:
+            percentage = 100
+        self.percentage = percentage
+        self.label = label
+        if style != None:
+            self.style = style
+        else:
+            self.style = Style()
+        if gauge_style != None:
+            self.gauge_style = gauge_style
+        else:
+            self.gauge_style = Style("green", "", True)
+        if track_style != None:
+            self.track_style = track_style
+        else:
+            self.track_style = Style("bright_black")
+        self.fill_char = fill_char
+        self.track_char = track_char
+
+    def render(self: Gauge, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty():
+            return
+        filled_width: int = area.width * self.percentage // 100
+        row: int = area.y
+        while row < area.y + area.height:
+            col: int = area.x
+            while col < area.x + area.width:
+                if col < area.x + filled_width:
+                    buf.set(col, row, self.fill_char, self.gauge_style)
+                else:
+                    buf.set(col, row, self.track_char, self.track_style)
+                col = col + 1
+            row = row + 1
+
+        # Render label centered in middle row
+        lbl: str = self.label
+        if len(lbl) == 0:
+            lbl = str(self.percentage) + "%"
+        lbl_w: int = cell_width(lbl)
+        if lbl_w < area.width:
+            lbl_x: int = area.x + (area.width - lbl_w) // 2
+            lbl_y: int = area.y + area.height // 2
+            buf.write_string(lbl_x, lbl_y, lbl, self.style, area.width)
+
+class Tabs:
+    titles: list[str]
+    selected_index: int
+    divider: str
+    selected_style: Style
+    unselected_style: Style
+    divider_style: Style
+
+    def __init__(self: Tabs, titles: list[str] | None = None, selected_index: int = 0, divider: str = "│", selected_style: Style | None = None, unselected_style: Style | None = None, divider_style: Style | None = None) -> None:
+        if titles != None:
+            self.titles = titles
+        else:
+            self.titles = []
+        self.selected_index = selected_index
+        self.divider = divider
+        if selected_style != None:
+            self.selected_style = selected_style
+        else:
+            self.selected_style = Style("yellow", "", True)
+        if unselected_style != None:
+            self.unselected_style = unselected_style
+        else:
+            self.unselected_style = Style("bright_black")
+        if divider_style != None:
+            self.divider_style = divider_style
+        else:
+            self.divider_style = Style("cyan")
+
+    def render(self: Tabs, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty() or len(self.titles) == 0:
+            return
+        cur_x: int = area.x
+        i: int = 0
+        n: int = len(self.titles)
+        while i < n:
+            if cur_x >= area.x + area.width:
+                break
+            if i > 0 and len(self.divider) > 0:
+                div_str: str = " " + self.divider + " "
+                cur_x = buf.write_string(cur_x, area.y, div_str, self.divider_style, area.x + area.width - cur_x)
+            title_text: str = self.titles[i]
+            st: Style = self.unselected_style
+            if i == self.selected_index:
+                st = self.selected_style
+                title_text = "[" + title_text + "]"
+            cur_x = buf.write_string(cur_x, area.y, title_text, st, area.x + area.width - cur_x)
+            i = i + 1
+
+class ListItem:
+    text: str
+    style: Style
+
+    def __init__(self: ListItem, text: str, style: Style | None = None) -> None:
+        self.text = text
+        if style != None:
+            self.style = style
+        else:
+            self.style = Style()
+
+class ListWidget:
+    items: list[ListItem]
+    selected_index: int
+    highlight_symbol: str
+    highlight_style: Style
+    scroll: int
+
+    def __init__(self: ListWidget, selected_index: int = -1, highlight_symbol: str = "► ", highlight_style: Style | None = None, scroll: int = 0) -> None:
+        self.items = []
+        self.selected_index = selected_index
+        self.highlight_symbol = highlight_symbol
+        if highlight_style != None:
+            self.highlight_style = highlight_style
+        else:
+            self.highlight_style = Style("bright_blue", "", True)
+        if scroll < 0:
+            scroll = 0
+        self.scroll = scroll
+
+    def add_item(self: ListWidget, text: str, style: Style | None = None) -> ListWidget:
+
+        self.items.append(ListItem(text, style))
+        return self
+
+    def select(self: ListWidget, index: int) -> None:
+
+        if index < -1:
+            index = -1
+        if index >= len(self.items):
+            index = len(self.items) - 1
+        self.selected_index = index
+
+    def select_next(self: ListWidget) -> None:
+
+        if len(self.items) == 0:
+            return
+        if self.selected_index < len(self.items) - 1:
+            self.selected_index = self.selected_index + 1
+        else:
+            self.selected_index = 0
+
+    def select_prev(self: ListWidget) -> None:
+
+        if len(self.items) == 0:
+            return
+        if self.selected_index > 0:
+            self.selected_index = self.selected_index - 1
+        else:
+            self.selected_index = len(self.items) - 1
+
+    def render(self: ListWidget, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty():
+            return
+        row: int = area.y
+        idx: int = self.scroll
+        while idx < len(self.items) and row < area.y + area.height:
+            it: ListItem = self.items[idx]
+            item_text: str = it.text
+            st: Style = it.style
+            if idx == self.selected_index:
+                item_text = self.highlight_symbol + item_text
+                st = self.highlight_style
+            else:
+                sym_w: int = cell_width(self.highlight_symbol)
+                item_text = nox.strings.repeat(" ", sym_w) + item_text
+            buf.write_string(area.x, row, item_text, st, area.width)
+            row = row + 1
+            idx = idx + 1
+
+class TableWidget:
+    headers: list[str]
+    rows: list[list[str]]
+    col_widths: list[int]
+    header_style: Style
+    row_style: Style
+    selected_style: Style
+    selected_index: int
+    scroll: int
+
+    def __init__(self: TableWidget, headers: list[str] | None = None, col_widths: list[int] | None = None, header_style: Style | None = None, row_style: Style | None = None, selected_style: Style | None = None, selected_index: int = -1, scroll: int = 0) -> None:
+        if headers != None:
+            self.headers = headers
+        else:
+            self.headers = []
+        if col_widths != None:
+            self.col_widths = col_widths
+        else:
+            self.col_widths = []
+        self.rows = []
+        if header_style != None:
+            self.header_style = header_style
+        else:
+            self.header_style = Style("cyan", "", True)
+        if row_style != None:
+            self.row_style = row_style
+        else:
+            self.row_style = Style("white")
+        if selected_style != None:
+            self.selected_style = selected_style
+        else:
+            self.selected_style = Style("yellow", "", True)
+        self.selected_index = selected_index
+        if scroll < 0:
+            scroll = 0
+        self.scroll = scroll
+
+    def add_row(self: TableWidget, row_data: list[str]) -> TableWidget:
+
+        self.rows.append(row_data)
+        return self
+
+    def render(self: TableWidget, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty():
+            return
+        cur_y: int = area.y
+        # 1. Render Headers
+        if len(self.headers) > 0 and cur_y < area.y + area.height:
+            col_x: int = area.x
+            c_idx: int = 0
+            while c_idx < len(self.headers):
+                w: int = 15
+                if c_idx < len(self.col_widths):
+                    w = self.col_widths[c_idx]
+                buf.write_string(col_x, cur_y, self.headers[c_idx], self.header_style, w)
+                col_x = col_x + w + 1
+                c_idx = c_idx + 1
+            cur_y = cur_y + 1
+
+            # Separator line
+            if cur_y < area.y + area.height:
+                buf.fill_rect(area.x, cur_y, area.width, 1, "─", Style("bright_black"))
+                cur_y = cur_y + 1
+
+        # 2. Render Rows
+        r_idx: int = self.scroll
+        while r_idx < len(self.rows) and cur_y < area.y + area.height:
+            row_data: list[str] = self.rows[r_idx]
+            st: Style = self.row_style
+            if r_idx == self.selected_index:
+                st = self.selected_style
+            col_x2: int = area.x
+            c_idx2: int = 0
+            while c_idx2 < len(row_data):
+                w2: int = 15
+                if c_idx2 < len(self.col_widths):
+                    w2 = self.col_widths[c_idx2]
+                val: str = row_data[c_idx2]
+                buf.write_string(col_x2, cur_y, val, st, w2)
+                col_x2 = col_x2 + w2 + 1
+                c_idx2 = c_idx2 + 1
+            cur_y = cur_y + 1
+            r_idx = r_idx + 1
+
+class HelpBar:
+    shortcuts: list[str]
+    descriptions: list[str]
+    key_style: Style
+    desc_style: Style
+    separator: str
+
+    def __init__(self: HelpBar, key_style: Style | None = None, desc_style: Style | None = None, separator: str = "  ") -> None:
+        self.shortcuts = []
+        self.descriptions = []
+        if key_style != None:
+            self.key_style = key_style
+        else:
+            self.key_style = Style("cyan", "", True)
+        if desc_style != None:
+            self.desc_style = desc_style
+        else:
+            self.desc_style = Style("bright_black")
+        self.separator = separator
+
+    def add(self: HelpBar, key: str, desc: str) -> HelpBar:
+
+        self.shortcuts.append(key)
+        self.descriptions.append(desc)
+        return self
+
+    def render(self: HelpBar, area: Rect, buf: ScreenBuffer) -> None:
+
+        if area.is_empty() or len(self.shortcuts) == 0:
+            return
+        cur_x: int = area.x
+        i: int = 0
+        n: int = len(self.shortcuts)
+        while i < n:
+            if cur_x >= area.x + area.width:
+                break
+            if i > 0:
+                cur_x = buf.write_string(cur_x, area.y, self.separator, Style(), area.x + area.width - cur_x)
+            key_str: str = self.shortcuts[i]
+            cur_x = buf.write_string(cur_x, area.y, key_str, self.key_style, area.x + area.width - cur_x)
+            cur_x = buf.write_string(cur_x, area.y, " ", Style(), area.x + area.width - cur_x)
+            desc_str: str = self.descriptions[i]
+            cur_x = buf.write_string(cur_x, area.y, desc_str, self.desc_style, area.x + area.width - cur_x)
+            i = i + 1

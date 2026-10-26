@@ -1,0 +1,181 @@
+# tests/unit/tui_widgets_test.nox — Comprehensive unit tests for declarative TUI widgets.
+
+import nox.test
+import core
+from core import Style
+import layout
+from layout import Rect
+import tui
+from tui import ScreenBuffer
+import widgets
+from widgets import Block, Paragraph, Gauge, Tabs, ListItem, ListWidget, TableWidget, HelpBar
+
+# 1. Block Widget Tests
+buf: ScreenBuffer = ScreenBuffer(30, 10)
+blk: Block = Block("Status", "left", "rounded")
+
+# Inner rect calculation
+area: Rect = Rect(0, 0, 20, 8)
+inner_area: Rect = blk.inner(area)
+nox.test.assert_eq_int(inner_area.x, 1, "inner rect x inset by 1")
+nox.test.assert_eq_int(inner_area.y, 1, "inner rect y inset by 1")
+nox.test.assert_eq_int(inner_area.width, 18, "inner rect width reduced by 2")
+nox.test.assert_eq_int(inner_area.height, 6, "inner rect height reduced by 2")
+
+# Render rounded block
+blk.render(area, buf)
+nox.test.assert_eq_str(buf.get(0, 0).char, "╭", "top-left rounded corner")
+nox.test.assert_eq_str(buf.get(19, 0).char, "╮", "top-right rounded corner")
+nox.test.assert_eq_str(buf.get(0, 7).char, "╰", "bottom-left rounded corner")
+nox.test.assert_eq_str(buf.get(19, 7).char, "╯", "bottom-right rounded corner")
+nox.test.assert_eq_str(buf.get(0, 1).char, "│", "vertical border")
+
+# Title check: " Status " at area.x + 2
+nox.test.assert_eq_str(buf.get(2, 0).char, " ", "title padding")
+nox.test.assert_eq_str(buf.get(3, 0).char, "S", "title char S")
+nox.test.assert_eq_str(buf.get(4, 0).char, "t", "title char t")
+
+# Square border type
+buf.clear()
+blk_sq: Block = Block("", "left", "square")
+blk_sq.render(Rect(0, 0, 10, 5), buf)
+nox.test.assert_eq_str(buf.get(0, 0).char, "┌", "top-left square corner")
+nox.test.assert_eq_str(buf.get(9, 0).char, "┐", "top-right square corner")
+nox.test.assert_eq_str(buf.get(0, 4).char, "└", "bottom-left square corner")
+nox.test.assert_eq_str(buf.get(9, 4).char, "┘", "bottom-right square corner")
+
+# Double border type
+buf.clear()
+blk_db: Block = Block("", "left", "double")
+blk_db.render(Rect(0, 0, 10, 5), buf)
+nox.test.assert_eq_str(buf.get(0, 0).char, "╔", "top-left double corner")
+nox.test.assert_eq_str(buf.get(9, 0).char, "╗", "top-right double corner")
+nox.test.assert_eq_str(buf.get(1, 0).char, "═", "horizontal double border")
+nox.test.assert_eq_str(buf.get(0, 1).char, "║", "vertical double border")
+
+# ASCII border type
+buf.clear()
+blk_asc: Block = Block("", "left", "ascii")
+blk_asc.render(Rect(0, 0, 10, 5), buf)
+nox.test.assert_eq_str(buf.get(0, 0).char, "+", "top-left ascii corner")
+nox.test.assert_eq_str(buf.get(1, 0).char, "-", "horizontal ascii border")
+nox.test.assert_eq_str(buf.get(0, 1).char, "|", "vertical ascii border")
+
+# 2. Paragraph Widget Tests
+buf.clear()
+p1: Paragraph = Paragraph("Hello World", None, True, 0, "left")
+p1.render(Rect(2, 2, 15, 3), buf)
+nox.test.assert_eq_str(buf.get(2, 2).char, "H", "paragraph starts at x=2, y=2")
+nox.test.assert_eq_str(buf.get(6, 2).char, "o", "paragraph text char")
+
+# Paragraph multi-line wrapping
+buf.clear()
+p_wrap: Paragraph = Paragraph("The quick brown fox jumps over the lazy dog", None, True, 0, "left")
+p_wrap.render(Rect(0, 0, 16, 4), buf)
+nox.test.assert_eq_str(buf.get(0, 0).char, "T", "first line starts with T")
+# 2nd line must exist
+nox.test.assert_true(buf.get(0, 1).char != " ", "second line contains wrapped text")
+
+# Paragraph scroll offset
+buf.clear()
+p_scroll: Paragraph = Paragraph("Line 1\nLine 2\nLine 3", None, False, 1, "left")
+p_scroll.render(Rect(0, 0, 20, 3), buf)
+# Row 0 should render Line 2 because scroll = 1
+nox.test.assert_eq_str(buf.get(0, 0).char, "L", "first displayed line is Line 2")
+nox.test.assert_eq_str(buf.get(5, 0).char, "2", "line 2 indicator")
+
+# 3. Gauge Widget Tests
+buf.clear()
+g: Gauge = Gauge(50, "50%", None, None, None, "█", "─")
+g.render(Rect(0, 0, 20, 1), buf)
+# First 10 cells (0..9) should be '█', 10..19 should be '─' or label
+# Cell 0 must be filled
+nox.test.assert_eq_str(buf.get(0, 0).char, "█", "first gauge cell filled")
+nox.test.assert_eq_str(buf.get(1, 0).char, "█", "second gauge cell filled")
+# Cell 19 must be track or label
+nox.test.assert_true(buf.get(19, 0).char == "─" or buf.get(19, 0).char == "%", "end cell is track or label")
+
+# Clamping
+g_neg: Gauge = Gauge(-20)
+nox.test.assert_eq_int(g_neg.percentage, 0, "negative percentage clamped to 0")
+g_over: Gauge = Gauge(150)
+nox.test.assert_eq_int(g_over.percentage, 100, "over-100 percentage clamped to 100")
+
+# 4. Tabs Widget Tests
+buf.clear()
+tabs: Tabs = Tabs(["Overview", "Logs", "Settings"], 1, "│")
+tabs.render(Rect(0, 0, 30, 1), buf)
+# Tab 0 is unselected: "Overview"
+nox.test.assert_eq_str(buf.get(0, 0).char, "O", "tab 0 starts with O")
+# Tab 1 is selected: "[Logs]"
+# Check somewhere after Tab 0 contains '['
+found_bracket: bool = False
+idx: int = 0
+while idx < 25:
+    if buf.get(idx, 0).char == "[":
+        found_bracket = True
+    idx = idx + 1
+nox.test.assert_true(found_bracket, "selected tab enclosed in brackets")
+
+# 5. ListWidget Tests
+buf.clear()
+lst: ListWidget = ListWidget(-1, "► ")
+lst.add_item("Item 1")
+lst.add_item("Item 2")
+lst.add_item("Item 3")
+nox.test.assert_eq_int(len(lst.items), 3, "three items in list")
+
+# Selection navigation
+lst.select_next()
+nox.test.assert_eq_int(lst.selected_index, 0, "select next from -1 moves to 0")
+lst.select_next()
+nox.test.assert_eq_int(lst.selected_index, 1, "select next moves to 1")
+lst.select_prev()
+nox.test.assert_eq_int(lst.selected_index, 0, "select prev moves to 0")
+lst.select_prev()
+nox.test.assert_eq_int(lst.selected_index, 2, "select prev wraps around to last item")
+
+# Render list
+buf.clear()
+lst.select(0)
+lst.render(Rect(0, 0, 20, 5), buf)
+# Row 0 has highlight symbol '► '
+nox.test.assert_eq_str(buf.get(0, 0).char, "►", "first row has selection pointer")
+
+# 6. TableWidget Tests
+buf.clear()
+tbl: TableWidget = TableWidget(["ID", "Name", "Role"], [5, 10, 10])
+tbl.add_row(["1", "Alice", "Admin"])
+tbl.add_row(["2", "Bob", "User"])
+tbl.render(Rect(0, 0, 30, 6), buf)
+
+# Header row at y=0
+nox.test.assert_eq_str(buf.get(0, 0).char, "I", "header starts with I")
+nox.test.assert_eq_str(buf.get(1, 0).char, "D", "header second char D")
+
+# Separator row at y=1
+nox.test.assert_eq_str(buf.get(0, 1).char, "─", "separator horizontal line")
+
+# First data row at y=2
+nox.test.assert_eq_str(buf.get(0, 2).char, "1", "data row 1 ID is 1")
+# Second data row at y=3
+nox.test.assert_eq_str(buf.get(0, 3).char, "2", "data row 2 ID is 2")
+
+# 7. HelpBar Widget Tests
+buf.clear()
+help_bar: HelpBar = HelpBar(None, None, " | ")
+help_bar.add("q", "Quit")
+help_bar.add("r", "Refresh")
+help_bar.render(Rect(0, 0, 30, 1), buf)
+
+nox.test.assert_eq_str(buf.get(0, 0).char, "q", "first keybinding is q")
+nox.test.assert_eq_str(buf.get(2, 0).char, "Q", "first desc starts with Q")
+
+# 8. ScreenBuffer to_text() Test
+buf_mini: ScreenBuffer = ScreenBuffer(5, 2)
+buf_mini.write_string(0, 0, "AB")
+buf_mini.write_string(0, 1, "CD")
+txt: str = buf_mini.to_text()
+nox.test.assert_eq_str(txt, "AB   \nCD   ", "buffer to_text outputs rows separated by newline")
+
+print("tui_widgets_test passed")

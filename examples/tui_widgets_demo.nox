@@ -1,0 +1,109 @@
+# examples/tui_widgets_demo.nox — Declarative TUI widgets showcase for Rune.
+
+import rune
+from rune import Console, Style, TerminalDriver, MockTerminalDriver, Rect, Layout, length_constraint, percentage_constraint, min_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, Block, Paragraph, Gauge, Tabs, ListWidget, TableWidget, HelpBar
+
+con: Console = Console()
+con.print("=== Rune 1.3.0 — Declarative TUI Widgets Showcase ===")
+con.print("")
+
+# Mock terminal screen with 80 columns x 24 rows
+driver: MockTerminalDriver = MockTerminalDriver(80, 24, True, True)
+screen: Rect = Rect(0, 0, 80, 24)
+
+# 1. Top-level vertical layout: Header (3), Main Body (18), Footer (3)
+v_layout: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+v_layout.add_constraint(length_constraint(3))
+v_layout.add_constraint(min_constraint(15))
+v_layout.add_constraint(length_constraint(3))
+
+panes: list[Rect] = v_layout.split(screen)
+header_rect: Rect = panes[0]
+main_rect: Rect = panes[1]
+footer_rect: Rect = panes[2]
+
+# 2. Render Header with Tabs
+tabs: Tabs = Tabs(["Dashboard", "Nodes", "Metrics", "Audit Logs"], 0, "│")
+header_block: Block = Block("Rune v1.3.0 TUI Framework", "left", "rounded", Style("cyan"))
+header_block.render(header_rect, driver.current_buffer)
+tabs.render(header_block.inner(header_rect), driver.current_buffer)
+
+# 3. Horizontal split for Main Body: Sidebar (24 cols), Workspace (rest)
+h_layout: Layout = Layout(DIRECTION_HORIZONTAL, 0, 1)
+h_layout.add_constraint(length_constraint(24))
+h_layout.add_constraint(min_constraint(40))
+
+main_splits: list[Rect] = h_layout.split(main_rect)
+sidebar_rect: Rect = main_splits[0]
+workspace_rect: Rect = main_splits[1]
+
+# 4. Render Sidebar ListWidget
+sidebar_block: Block = Block("Services", "left", "rounded", Style("bright_blue"))
+sidebar_block.render(sidebar_rect, driver.current_buffer)
+
+service_list: ListWidget = ListWidget(0, "► ", Style("yellow", "", True))
+service_list.add_item("API Gateway")
+service_list.add_item("Auth Service")
+service_list.add_item("Worker Pool")
+service_list.add_item("Database Primary")
+service_list.add_item("Cache Cluster")
+service_list.render(sidebar_block.inner(sidebar_rect), driver.current_buffer)
+
+# 5. Split Workspace vertically: Gauges (6 rows) and TableWidget (rest)
+ws_layout: Layout = Layout(DIRECTION_VERTICAL, 0, 0)
+ws_layout.add_constraint(length_constraint(6))
+ws_layout.add_constraint(min_constraint(8))
+
+ws_splits: list[Rect] = ws_layout.split(workspace_rect)
+gauge_rect: Rect = ws_splits[0]
+table_rect: Rect = ws_splits[1]
+
+# 6. Render Gauges
+gauge_block: Block = Block("System Resources", "left", "rounded", Style("green"))
+gauge_block.render(gauge_rect, driver.current_buffer)
+gauge_inner: Rect = gauge_block.inner(gauge_rect)
+
+# Split gauge_inner for two gauges
+g_layout: Layout = Layout(DIRECTION_VERTICAL, 0, 1)
+g_layout.add_constraint(length_constraint(1))
+g_layout.add_constraint(length_constraint(1))
+g_panes: list[Rect] = g_layout.split(gauge_inner)
+
+cpu_gauge: Gauge = Gauge(72, "CPU: 72%", Style("white", "", True), Style("red", "", True))
+cpu_gauge.render(g_panes[0], driver.current_buffer)
+
+mem_gauge: Gauge = Gauge(48, "MEM: 48%", Style("white", "", True), Style("green", "", True))
+mem_gauge.render(g_panes[1], driver.current_buffer)
+
+# 7. Render TableWidget
+table_block: Block = Block("Active Deployments", "left", "rounded", Style("magenta"))
+table_block.render(table_rect, driver.current_buffer)
+
+tbl: TableWidget = TableWidget(
+    ["ID", "Service Name", "Status", "Latency", "Tasks"],
+    [6, 16, 10, 8, 6],
+    Style("magenta", "", True),
+    Style("white"),
+    Style("cyan", "", True),
+    0
+)
+tbl.add_row(["#101", "api-gateway", "HEALTHY", "12ms", "3/3"])
+tbl.add_row(["#102", "auth-service", "HEALTHY", "8ms", "2/2"])
+tbl.add_row(["#103", "worker-pool", "DEGRADED", "145ms", "5/8"])
+tbl.add_row(["#104", "db-primary", "HEALTHY", "2ms", "1/1"])
+tbl.render(table_block.inner(table_rect), driver.current_buffer)
+
+# 8. Render Footer with HelpBar
+footer_block: Block = Block("", "left", "none")
+help_bar: HelpBar = HelpBar(Style("yellow", "", True), Style("bright_black"), "  ")
+help_bar.add("F1", "Help")
+help_bar.add("Tab", "Switch Tab")
+help_bar.add("↑/↓", "Navigate List")
+help_bar.add("Enter", "Inspect")
+help_bar.add("q", "Quit")
+help_bar.render(footer_rect, driver.current_buffer)
+
+# 9. Flush driver to terminal
+driver.flush()
+con.print(driver.current_buffer.to_text())
+

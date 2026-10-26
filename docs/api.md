@@ -374,4 +374,93 @@ class Layout:
     def set_spacing(self: Layout, spacing: int) -> Layout: ...
     def add_constraint(self: Layout, c: Constraint) -> Layout: ...
     def split(self: Layout, area: Rect) -> list[Rect]: ...
+
+class Block:
+    title: str
+    title_alignment: str
+    border_type: str
+    border_style: Style
+    title_style: Style
+
+    def __init__(self: Block, title: str = "", title_alignment: str = "left", border_type: str = "rounded", border_style: Style | None = None, title_style: Style | None = None) -> None: ...
+    def inner(self: Block, area: Rect) -> Rect: ...
+    def render(self: Block, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class Paragraph:
+    text: str
+    style: Style
+    wrap: bool
+    scroll: int
+    alignment: str
+
+    def __init__(self: Paragraph, text: str = "", style: Style | None = None, wrap: bool = True, scroll: int = 0, alignment: str = "left") -> None: ...
+    def render(self: Paragraph, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class Gauge:
+    percentage: int
+    label: str
+    style: Style
+    gauge_style: Style
+    track_style: Style
+    fill_char: str
+    track_char: str
+
+    def __init__(self: Gauge, percentage: int = 0, label: str = "", style: Style | None = None, gauge_style: Style | None = None, track_style: Style | None = None, fill_char: str = "█", track_char: str = "─") -> None: ...
+    def render(self: Gauge, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class Tabs:
+    titles: list[str]
+    selected_index: int
+    divider: str
+    selected_style: Style
+    unselected_style: Style
+    divider_style: Style
+
+    def __init__(self: Tabs, titles: list[str] | None = None, selected_index: int = 0, divider: str = "│", selected_style: Style | None = None, unselected_style: Style | None = None, divider_style: Style | None = None) -> None: ...
+    def render(self: Tabs, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class ListItem:
+    text: str
+    style: Style
+
+    def __init__(self: ListItem, text: str, style: Style | None = None) -> None: ...
+
+class ListWidget:
+    items: list[ListItem]
+    selected_index: int
+    highlight_symbol: str
+    highlight_style: Style
+    scroll: int
+
+    def __init__(self: ListWidget, selected_index: int = -1, highlight_symbol: str = "► ", highlight_style: Style | None = None, scroll: int = 0) -> None: ...
+    def add_item(self: ListWidget, text: str, style: Style | None = None) -> ListWidget: ...
+    def select(self: ListWidget, index: int) -> None: ...
+    def select_next(self: ListWidget) -> None: ...
+    def select_prev(self: ListWidget) -> None: ...
+    def render(self: ListWidget, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class TableWidget:
+    headers: list[str]
+    rows: list[list[str]]
+    col_widths: list[int]
+    header_style: Style
+    row_style: Style
+    selected_style: Style
+    selected_index: int
+    scroll: int
+
+    def __init__(self: TableWidget, headers: list[str] | None = None, col_widths: list[int] | None = None, header_style: Style | None = None, row_style: Style | None = None, selected_style: Style | None = None, selected_index: int = -1, scroll: int = 0) -> None: ...
+    def add_row(self: TableWidget, row_data: list[str]) -> TableWidget: ...
+    def render(self: TableWidget, area: Rect, buf: ScreenBuffer) -> None: ...
+
+class HelpBar:
+    shortcuts: list[str]
+    descriptions: list[str]
+    key_style: Style
+    desc_style: Style
+    separator: str
+
+    def __init__(self: HelpBar, key_style: Style | None = None, desc_style: Style | None = None, separator: str = "  ") -> None: ...
+    def add(self: HelpBar, key: str, desc: str) -> HelpBar: ...
+    def render(self: HelpBar, area: Rect, buf: ScreenBuffer) -> None: ...
 ```

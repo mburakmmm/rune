@@ -26,7 +26,7 @@
 | **Phase 6.1: Security & Unicode** | `v1.0.1` | \r line spoofing fix, C1 stripping, cell_width wcwidth, CI prompts | **Completed** | `security_hardening_test` (18 suites) |
 | **Phase 7: TUI Screen Driver** | `v1.1.0` | Alt-screen buffers, diff-based cell grid painter, cursor control | **Completed** | `tui_buffer_test` (19 suites) |
 | **Phase 8: Geometry & Flex Layout** | `v1.2.0` | `Rect` geometry, `Constraint` types, flex layout solver | **Completed** | `tui_layout_test` (20 suites) |
-| **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Planned** | `tui_widgets_test` |
+| **Phase 9: Declarative Widgets** | `v1.3.0` | `Block`, `Paragraph`, `Gauge`, `Tabs`, `ListWidget`, `TableWidget` | **Completed** | `tui_widgets_test` (21 suites) |
 | **Phase 10: Event Loop & TUI App** | `v1.4.0` | ANSI key parser, `TuiApp` runtime, frame cycle, showcase dashboard | **Planned** | `tui_app_test` |
 
 ---
@@ -315,20 +315,27 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 🧩 v1.3.0 — Phase 9: Declarative TUI Widgets (Planned)
+### 🧩 v1.3.0 — Phase 9: Declarative TUI Widgets (Completed)
 **Goal:** Introduce a composable widget library for building dashboards, monitors, and navigation panels.
 
-- [ ] **Container Widgets (`Block`)**:
-  - Frame container with borders (`rounded`, `square`, `double`, `ascii`).
-  - Configurable title, title alignment (`left`, `center`, `right`), and background styling.
-- [ ] **Text & Content Widgets**:
-  - `Paragraph`: multiline styled text with word wrapping, alignment, and vertical scroll offset (`scroll: int`).
-  - `Gauge`: visual percentage bar with fill characters and labels.
-  - `Tabs`: top navigation bar with active tab highlight and keyboard accelerators.
-- [ ] **Data & Selection Widgets**:
-  - `ListWidget`: vertical item list with selectable active row highlight (`selected_index: int`).
+- [x] **Container Widgets (`Block`)**:
+  - Frame container with borders (`rounded`, `square`, `double`, `ascii`, `none`).
+  - Configurable title, title alignment (`left`, `center`, `right`), and border styling.
+  - Automatic inner area calculation via `block.inner(area)` for nested child rendering.
+- [x] **Text & Content Widgets**:
+  - `Paragraph`: multiline styled text with word wrapping, alignment (`left`, `center`, `right`), and vertical scroll offset (`scroll: int`).
+  - `Gauge`: visual percentage bar with fill characters (`"█"`), track character (`"─"`), and centered label.
+  - `Tabs`: top navigation bar with active tab highlight (`[Tab]`) and configurable dividers (`"│"`).
+- [x] **Data & Selection Widgets**:
+  - `ListWidget`: vertical item list with selectable active row highlight (`selected_index: int`, `select_next()`, `select_prev()`).
   - `TableWidget`: fixed column headers, scrollable rows, and selected row indicator.
   - `HelpBar`: bottom footer displaying active keybindings (e.g. `[q] Quit  [Tab] Switch  [↑/↓] Navigate`).
+- [x] **Buffer Plain-Text Inspection (`ScreenBuffer.to_text`)**:
+  - Convert 2D buffer into newline-delimited plain text string for snapshot tests and terminal fallbacks.
+- [x] **Comprehensive Test Suite**:
+  - Added `tests/unit/tui_widgets_test.nox` (21 suites total).
+- [x] **Comprehensive Example**:
+  - Added `examples/tui_widgets_demo.nox` demonstrating an 80x24 multi-pane terminal dashboard.
 
 ---
 

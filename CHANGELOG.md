@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-10-26
+
+### Added (Phase 9: Declarative TUI Widgets)
+- **`Block` Widget (`rune.tui` / `widgets.nox`)**:
+  - Container box with customizable border styles (`"rounded"`, `"square"`, `"double"`, `"ascii"`, `"none"`).
+  - Title positioning with alignment support (`"left"`, `"center"`, `"right"`).
+  - Automatic inner area calculation via `block.inner(area)` for nested widget rendering.
+- **`Paragraph` Widget**:
+  - Multiline text rendering with automatic wrapping or raw newline splitting.
+  - Text alignment (`"left"`, `"center"`, `"right"`) and vertical scroll offset support.
+- **`Gauge` Widget**:
+  - Visual progress bar / meter (0%..100%) with fill character (`"█"`), track character (`"─"`), and centered label.
+  - Boundary value clamping (negative values clamp to 0%, over-100% clamp to 100%).
+- **`Tabs` Widget**:
+  - Interactive tab bar header with active tab highlighting (`[Tab Name]`), inactive tab styling, and configurable separators (`"│"`).
+- **`ListItem` & `ListWidget`**:
+  - Selectable vertical list of items.
+  - Navigation helpers: `select(index)`, `select_next()`, `select_prev()` with cyclic wrap-around.
+  - Active selection indicator pointer (`"► "`) and unselected item indentation alignment.
+- **`TableWidget`**:
+  - Structured 2D table grid with customizable headers, column widths, separator rule, and data rows.
+  - Selected row highlighting and vertical scroll offset.
+- **`HelpBar` Widget**:
+  - Footer keybinding shortcuts bar (`key` + `description`), with customizable separators and styling.
+- **`ScreenBuffer.to_text()`**:
+  - Utility method converting a 2D screen buffer into a newline-separated plain text string for snapshot testing, logging, and inspection.
+- **Test Suite**:
+  - Added `tests/unit/tui_widgets_test.nox` (21 passing test suites total).
+- **Example**:
+  - Added `examples/tui_widgets_demo.nox` featuring a comprehensive 80x24 multi-pane terminal dashboard combining `Layout`, `Block`, `Tabs`, `Gauge`, `ListWidget`, `TableWidget`, and `HelpBar`.
+
+---
+
 ## [1.2.0] - 2026-10-26
 
 ### Added (Phase 8: Geometry & Flex Layout Engine)
