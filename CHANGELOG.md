@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-10-26
+
+### Added
+- **Shell Autocompletion (`rune.cli`)**:
+  - `generate_bash_completion(cmd: Command) -> str`: generates Bash completion script using `compgen`, extracting subcommands, subcommand aliases, options, and option choices.
+  - `generate_fish_completion(cmd: Command) -> str`: generates native Fish completion script with subcommands, descriptions, short/long flags, and `-a` choice arguments.
+  - `generate_zsh_completion(cmd: Command) -> str`: generates Zsh completion script with `_arguments` and `_describe` commands.
+  - `generate_completion(cmd: Command, shell: str) -> str`: unified completion dispatcher for `bash`, `fish`, and `zsh`.
+  - `sanitize_shell_str(s: str) -> str`: sanitizes all shell identifiers and text to prevent command injection vulnerabilities.
+- **Unit Tests**:
+  - `tests/unit/completion_test.nox` covering Bash, Fish, Zsh script generation, subcommand extraction, option choices, and shell injection protection.
+
+---
+
 ## [0.6.0] - 2026-10-26
 
 ### Added

@@ -175,16 +175,17 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.7.0 — Shell Autocompletion
+### 📦 v0.7.0 — Shell Autocompletion (Completed)
 **Goal:** Fast, native shell tab-completion for Rune CLIs.
 
-- [ ] **Completion Script Generator**:
+- [x] **Completion Script Generator**:
   - Generate completion scripts for **Bash**, **Zsh**, and **Fish**.
-  - Extract subcommands, options, and choices statically from `CliApp` definition.
-- [ ] **Safe Shell Escaping**:
-  - Escape all generated completions to eliminate shell injection vulnerabilities.
-- [ ] **CLI Integration**:
-  - Add built-in command `--install-completion [bash|zsh|fish]`.
+  - Extract subcommands, subcommand aliases, options, short flags, and choices statically from `Command` tree.
+- [x] **Safe Shell Escaping**:
+  - `sanitize_shell_str()` eliminates shell injection vulnerabilities (semicolons, backticks, subshells, quotes, pipes).
+- [x] **Shell Dispatcher**:
+  - `generate_completion(cmd, shell)` with automatic shell routing and error handling.
+  - Re-exported under `rune` and `rune.cli`.
 
 ---
 

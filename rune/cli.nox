@@ -6,3 +6,5 @@ import options
 from options import Option
 import errors
 from errors import CliError, UsageError, UnknownOptionError, MissingArgumentError, MissingOptionValueError, InvalidTypeError, CommandNotFoundError
+import completion
+from completion import generate_completion, generate_bash_completion, generate_zsh_completion, generate_fish_completion

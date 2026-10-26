@@ -1,0 +1,207 @@
+# completion.nox — Shell completion script generators for Bash, Zsh, and Fish.
+
+import nox.strings
+import arguments
+from arguments import Argument
+import options
+from options import Option
+import cli
+from cli import Command
+
+def sanitize_shell_str(s: str) -> str:
+    res: str = ""
+    i: int = 0
+    n: int = len(s)
+    while i < n:
+        c: str = s[i]
+        if c == "\"" or c == "'" or c == "`" or c == "$" or c == "\\" or c == ";" or c == "&" or c == "|" or c == ">" or c == "<":
+            res = res + ""
+        else:
+            res = res + c
+        i = i + 1
+    return res
+
+def collect_command_names(cmd: Command) -> list[str]:
+    names: list[str] = []
+    idx: int = 0
+    while idx < len(cmd.subcommands):
+        sub: Command = cmd.subcommands[idx]
+        names.append(sub.name)
+        # Also include sub aliases
+        a_idx: int = 0
+        while a_idx < len(sub.aliases):
+            names.append(sub.aliases[a_idx])
+            a_idx = a_idx + 1
+        idx = idx + 1
+    return names
+
+def collect_options_tokens(cmd: Command) -> list[str]:
+    tokens: list[str] = ["--help", "-h", "--version", "-v"]
+    idx: int = 0
+    while idx < len(cmd.options):
+        opt: Option = cmd.options[idx]
+        tokens.append("--" + opt.name)
+        if len(opt.short_name) > 0:
+            tokens.append("-" + opt.short_name)
+        idx = idx + 1
+    return tokens
+
+def generate_bash_completion(cmd: Command) -> str:
+    app_name: str = sanitize_shell_str(cmd.name)
+    subcmds: list[str] = collect_command_names(cmd)
+    subcmds_str: str = nox.strings.join(subcmds, " ")
+    opts: list[str] = collect_options_tokens(cmd)
+    opts_str: str = nox.strings.join(opts, " ")
+
+    lines: list[str] = []
+    lines.append("# bash completion for " + app_name)
+    lines.append("_" + app_name + "_completion() {")
+    lines.append("    local cur prev words cword")
+    lines.append("    _init_completion -n = 2>/dev/null || return")
+    lines.append("")
+    lines.append("    local subcommands=\"" + subcmds_str + "\"")
+    lines.append("    local options=\"" + opts_str + "\"")
+    lines.append("")
+    lines.append("    if [[ ${cword} -eq 1 ]]; then")
+    lines.append("        COMPREPLY=( $(compgen -W \"${subcommands} ${options}\" -- \"${cur}\") )")
+    lines.append("        return 0")
+    lines.append("    fi")
+    lines.append("")
+
+    # Choices matching
+    lines.append("    case \"${prev}\" in")
+    o_idx: int = 0
+    while o_idx < len(cmd.options):
+        opt: Option = cmd.options[o_idx]
+        if len(opt.choices) > 0:
+            choices_str: str = nox.strings.join(opt.choices, " ")
+            lines.append("        --" + opt.name + ")")
+            lines.append("            COMPREPLY=( $(compgen -W \"" + choices_str + "\" -- \"${cur}\") )")
+            lines.append("            return 0")
+            lines.append("            ;;")
+        o_idx = o_idx + 1
+    lines.append("    esac")
+    lines.append("")
+    lines.append("    COMPREPLY=( $(compgen -W \"${options}\" -- \"${cur}\") )")
+    lines.append("}")
+    lines.append("complete -F _" + app_name + "_completion " + app_name)
+    lines.append("")
+
+    return nox.strings.join(lines, "\n")
+
+def generate_fish_completion(cmd: Command) -> str:
+    app_name: str = sanitize_shell_str(cmd.name)
+    lines: list[str] = []
+    lines.append("# fish completion for " + app_name)
+    lines.append("complete -c " + app_name + " -e")
+    lines.append("")
+    lines.append("# Global flags")
+    lines.append("complete -c " + app_name + " -l help -s h -d \"Show help information\"")
+    lines.append("complete -c " + app_name + " -l version -s v -d \"Show version information\"")
+    lines.append("")
+
+    # Subcommands
+    lines.append("# Subcommands")
+    idx: int = 0
+    while idx < len(cmd.subcommands):
+        sub: Command = cmd.subcommands[idx]
+        sub_name: str = sanitize_shell_str(sub.name)
+        sub_desc: str = sanitize_shell_str(sub.description)
+        lines.append("complete -c " + app_name + " -n \"__fish_use_subcommand\" -a \"" + sub_name + "\" -d \"" + sub_desc + "\"")
+        idx = idx + 1
+    lines.append("")
+
+    # Options
+    lines.append("# Options")
+    o_idx: int = 0
+    while o_idx < len(cmd.options):
+        opt: Option = cmd.options[o_idx]
+        opt_name: str = sanitize_shell_str(opt.name)
+        opt_help: str = sanitize_shell_str(opt.help)
+        line: str = "complete -c " + app_name + " -l " + opt_name
+        if len(opt.short_name) > 0:
+            line = line + " -s " + sanitize_shell_str(opt.short_name)
+        if len(opt.choices) > 0:
+            choices_str: str = nox.strings.join(opt.choices, " ")
+            line = line + " -r -f -a \"" + choices_str + "\""
+        if len(opt_help) > 0:
+            line = line + " -d \"" + opt_help + "\""
+        lines.append(line)
+        o_idx = o_idx + 1
+
+    lines.append("")
+    return nox.strings.join(lines, "\n")
+
+def generate_zsh_completion(cmd: Command) -> str:
+    app_name: str = sanitize_shell_str(cmd.name)
+    lines: list[str] = []
+    lines.append("#compdef " + app_name)
+    lines.append("")
+    lines.append("_" + app_name + "() {")
+    lines.append("    local context state state_descr line")
+    lines.append("    typeset -A opt_args")
+    lines.append("")
+
+    # Options list
+    lines.append("    local -a opts")
+    lines.append("    opts=(")
+    lines.append("        \"(-h --help)\"{-h,--help}\"[Show help information]\"")
+    lines.append("        \"(-v --version)\"{-v,--version}\"[Show version information]\"")
+
+    o_idx: int = 0
+    while o_idx < len(cmd.options):
+        opt: Option = cmd.options[o_idx]
+        opt_name: str = sanitize_shell_str(opt.name)
+        opt_help: str = sanitize_shell_str(opt.help)
+        if len(opt.choices) > 0:
+            ch_str: str = nox.strings.join(opt.choices, " ")
+            lines.append("        \"--" + opt_name + "[" + opt_help + "]:(" + ch_str + ")\"")
+        else:
+            if opt.is_flag:
+                lines.append("        \"--" + opt_name + "[" + opt_help + "]\"")
+            else:
+                lines.append("        \"--" + opt_name + "[" + opt_help + "]:value:()\"")
+        o_idx = o_idx + 1
+    lines.append("    )")
+    lines.append("")
+
+    # Subcommands
+    if len(cmd.subcommands) > 0:
+        lines.append("    local -a subcommands")
+        lines.append("    subcommands=(")
+        s_idx: int = 0
+        while s_idx < len(cmd.subcommands):
+            sub: Command = cmd.subcommands[s_idx]
+            lines.append("        \"" + sanitize_shell_str(sub.name) + ":" + sanitize_shell_str(sub.description) + "\"")
+            s_idx = s_idx + 1
+        lines.append("    )")
+        lines.append("")
+        lines.append("    _arguments -C \\")
+        lines.append("        $opts \\")
+        lines.append("        \"1: :->cmd\" \\")
+        lines.append("        \"*::arg:->args\"")
+        lines.append("")
+        lines.append("    case $state in")
+        lines.append("        cmd)")
+        lines.append("            _describe -t commands \"" + app_name + " subcommands\" subcommands")
+        lines.append("            ;;")
+        lines.append("    esac")
+    else:
+        lines.append("    _arguments -s $opts")
+
+    lines.append("}")
+    lines.append("")
+    lines.append("_" + app_name + " \"$@\"")
+    lines.append("")
+
+    return nox.strings.join(lines, "\n")
+
+def generate_completion(cmd: Command, shell: str) -> str:
+    sh: str = nox.strings.lower(shell)
+    if sh == "bash":
+        return generate_bash_completion(cmd)
+    if sh == "fish":
+        return generate_fish_completion(cmd)
+    if sh == "zsh":
+        return generate_zsh_completion(cmd)
+    return "# Unsupported shell: " + shell + " (supported: bash, zsh, fish)"

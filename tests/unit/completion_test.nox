@@ -1,0 +1,71 @@
+# tests/unit/completion_test.nox — Unit tests for shell autocompletion generator.
+
+import nox.test
+import nox.strings
+import arguments
+from arguments import TYPE_STR, TYPE_INT, TYPE_BOOL
+import options
+from options import Option
+import cli
+from cli import Command
+import completion
+from completion import generate_bash_completion, generate_fish_completion, generate_zsh_completion, generate_completion
+
+def create_sample_app() -> Command:
+    root: Command = Command("dock", "Docker-like container management tool")
+    root.add_option("config", "c", TYPE_STR, False, False, "", "Path to config file")
+    root.add_option("verbose", "v", TYPE_BOOL, True, False, "false", "Verbose output")
+
+    build_cmd: Command = Command("build", "Build a container image")
+    build_cmd.add_option("target", "t", TYPE_STR, False, False, "dev", "Build target", ["dev", "prod", "test"])
+    build_cmd.add_alias("b")
+    root.add_subcommand(build_cmd)
+
+    run_cmd: Command = Command("run", "Run a container")
+    run_cmd.add_option("network", "n", TYPE_STR, False, False, "bridge", "Network mode", ["host", "bridge", "none"])
+    root.add_subcommand(run_cmd)
+
+    return root
+
+# 1. Bash completion test
+cmd: Command = create_sample_app()
+bash_script: str = generate_bash_completion(cmd)
+
+nox.test.assert_true(nox.strings.contains(bash_script, "# bash completion for dock"), "Bash script header")
+nox.test.assert_true(nox.strings.contains(bash_script, "_dock_completion()"), "Bash completion function definition")
+nox.test.assert_true(nox.strings.contains(bash_script, "build b run"), "Bash subcommands and aliases")
+nox.test.assert_true(nox.strings.contains(bash_script, "--config -c --verbose -v"), "Bash options")
+nox.test.assert_true(nox.strings.contains(bash_script, "complete -F _dock_completion dock"), "Bash complete registration")
+
+# 2. Fish completion test
+fish_script: str = generate_fish_completion(cmd)
+
+nox.test.assert_true(nox.strings.contains(fish_script, "# fish completion for dock"), "Fish script header")
+nox.test.assert_true(nox.strings.contains(fish_script, "complete -c dock -e"), "Fish erase previous completions")
+nox.test.assert_true(nox.strings.contains(fish_script, "complete -c dock -n \"__fish_use_subcommand\" -a \"build\""), "Fish build subcommand")
+nox.test.assert_true(nox.strings.contains(fish_script, "complete -c dock -n \"__fish_use_subcommand\" -a \"run\""), "Fish run subcommand")
+nox.test.assert_true(nox.strings.contains(fish_script, "-l config -s c"), "Fish option with short name")
+
+# 3. Zsh completion test
+zsh_script: str = generate_zsh_completion(cmd)
+
+nox.test.assert_true(nox.strings.contains(zsh_script, "#compdef dock"), "Zsh compdef header")
+nox.test.assert_true(nox.strings.contains(zsh_script, "_dock() {"), "Zsh function definition")
+nox.test.assert_true(nox.strings.contains(zsh_script, "\"build:Build a container image\""), "Zsh subcommand description")
+nox.test.assert_true(nox.strings.contains(zsh_script, "\"run:Run a container\""), "Zsh subcommand description")
+
+# 4. Shell dispatcher test
+nox.test.assert_true(nox.strings.contains(generate_completion(cmd, "bash"), "_dock_completion()"), "Dispatcher for bash")
+nox.test.assert_true(nox.strings.contains(generate_completion(cmd, "fish"), "complete -c dock"), "Dispatcher for fish")
+nox.test.assert_true(nox.strings.contains(generate_completion(cmd, "zsh"), "#compdef dock"), "Dispatcher for zsh")
+nox.test.assert_true(nox.strings.contains(generate_completion(cmd, "unknown"), "Unsupported shell"), "Unsupported shell message")
+
+# 5. Shell injection sanitization test
+malicious_name: str = "app; rm -rf /; $(whoami)"
+clean_name: str = completion.sanitize_shell_str(malicious_name)
+nox.test.assert_true(not nox.strings.contains(clean_name, ";"), "Sanitize must strip semicolons")
+nox.test.assert_true(not nox.strings.contains(clean_name, "$("), "Sanitize must strip subshell syntax")
+nox.test.assert_true(not nox.strings.contains(clean_name, "`"), "Sanitize must strip backticks")
+nox.test.assert_true(not nox.strings.contains(clean_name, "\\"), "Sanitize must strip backslashes")
+
+print("completion_test passed")
