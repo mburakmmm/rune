@@ -1,0 +1,31 @@
+# prompt_demo.nox — Interactive & Non-interactive Prompts demonstration.
+
+import rune
+from rune import Console, ConsoleOptions, prompt_text, confirm, prompt_int, select_choice, select_multiple, NonInteractiveError
+
+# We configure a console with is_tty=False for demonstration to use defaults safely without blocking
+opts: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False)
+con: Console = Console(opts)
+
+con.print("=== Rune Prompts Demonstration ===")
+con.print("")
+
+# In CI or non-interactive mode, prompts use provided defaults safely:
+name: str = prompt_text("Enter project name", "my_nox_app", con)
+con.print("Selected Name: " + name)
+
+is_ok: bool = confirm("Initialize git repository?", True, con)
+if is_ok:
+    con.print("Git initialization: Enabled")
+else:
+    con.print("Git initialization: Disabled")
+
+port: int = prompt_int("Enter port number", 8080, 1024, 65535, 3, con)
+con.print("Configured Port: " + str(port))
+
+choice: str = select_choice("Select database", ["postgres", "sqlite", "mysql"], "postgres", con)
+con.print("Configured Database: " + choice)
+
+features: list[str] = select_multiple("Select enabled features", ["auth", "logging", "metrics", "tracing"], ["auth", "metrics"], con)
+con.print("Selected Features count: " + str(len(features)))
+con.print("")

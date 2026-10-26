@@ -1,0 +1,32 @@
+# progress_demo.nox — Progress Bar, Task tracking, and Spinner demonstration.
+
+import rune
+from rune import Console, ProgressBar, Task, Spinner
+
+console: Console = Console()
+
+console.print("")
+console.print("=== Rune Progress & Status Indicators Demo ===")
+console.print("")
+
+# 1. Deterministic Progress Bar with byte metrics
+pb: ProgressBar = ProgressBar(30)
+t1: Task = pb.add_task("Downloading dataset", 1048576)
+t1.update(524288)
+
+console.print(pb.render_task(t1, console.options))
+console.print("")
+
+# 2. Multi-task layout
+t2: Task = pb.add_task("Extracting packages", 50)
+t2.update(50)
+
+console.print("--- Multi-Task Layout ---")
+console.print(pb.render_all(console.options))
+console.print("")
+
+# 3. Spinner in non-TTY mode
+sp: Spinner = Spinner("Resolving dependencies...")
+console.print("--- Spinner Status Line ---")
+console.print(sp.render(console.options))
+console.print("")
