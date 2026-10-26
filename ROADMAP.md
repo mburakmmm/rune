@@ -139,16 +139,19 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 
 ---
 
-### 📦 v0.5.0 — Advanced Interactive Prompts
+### 📦 v0.5.0 — Advanced Interactive Prompts (Completed)
 **Goal:** Rich, validated user interaction for interactive CLI wizards.
 
-- [ ] **Custom Validators & Retry Loops**:
-  - Support validator functions `validate(input: str) -> bool`.
-  - Configurable maximum retries before raising `PromptError`.
-- [ ] **Multi-Select Prompt (`select_multiple`)**:
-  - Allow selecting zero, one, or multiple items from a list using comma-separated numbers or keys.
-- [ ] **Runtime-Gated Password Prompt**:
-  - When Nox stdlib introduces terminal echo suppression, integrate secure password entry without breaking backward compatibility.
+- [x] **Validated Integer & Numeric Input (`prompt_int`)**:
+  - Validates integer formatting with automatic whitespace trimming.
+  - Bounds enforcement: `min_val` and `max_val` constraints with descriptive errors.
+  - Configurable retry loop (`max_retries`) raising `PromptError` when exhausted.
+- [x] **Multi-Select Prompt (`select_multiple`)**:
+  - Allow selecting multiple options via comma-separated numbers (e.g. `1, 3`) or direct names.
+  - Supports keyword `all` to select all available choices.
+  - Configurable `default_selected` fallback on empty input.
+- [x] **Runtime-Gated Password Prompt**:
+  - Explicit `PromptError` detailing terminal raw mode / echo suppression prerequisite.
 
 ---
 

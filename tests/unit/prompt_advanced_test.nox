@@ -1,0 +1,42 @@
+# tests/unit/prompt_advanced_test.nox — Tests for prompt_int and select_multiple non-blocking behaviors.
+
+import nox.test
+import core
+from core import Console, ConsoleOptions
+import prompt
+from prompt import prompt_int, select_multiple
+
+opts_ci: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+test_con: Console = Console(opts_ci)
+
+# 1. prompt_int in non-interactive mode
+res_int_def: int = prompt_int("Enter port", 8080, None, None, 3, test_con)
+nox.test.assert_eq_int(res_int_def, 8080, "prompt_int must return default_val in CI")
+
+res_int_min: int = prompt_int("Enter count", None, 1, 100, 3, test_con)
+nox.test.assert_eq_int(res_int_min, 1, "prompt_int must fallback to min_val if no default")
+
+res_int_zero: int = prompt_int("Enter number", None, None, None, 3, test_con)
+nox.test.assert_eq_int(res_int_zero, 0, "prompt_int defaults to 0 if completely unconstrained")
+
+# 2. select_multiple in non-interactive mode
+frameworks: list[str] = ["Rune", "Nova", "Noxen", "Feather"]
+
+# With explicit default choices
+defaults: list[str] = ["Rune", "Nova"]
+res_multi_def: list[str] = select_multiple("Select frameworks", frameworks, defaults, test_con)
+nox.test.assert_eq_int(len(res_multi_def), 2, "select_multiple returns default_choices in CI")
+nox.test.assert_eq_str(res_multi_def[0], "Rune", "First default matches")
+nox.test.assert_eq_str(res_multi_def[1], "Nova", "Second default matches")
+
+# Without default choices: falls back to first item
+res_multi_fallback: list[str] = select_multiple("Select frameworks", frameworks, None, test_con)
+nox.test.assert_eq_int(len(res_multi_fallback), 1, "select_multiple fallback returns single item list")
+nox.test.assert_eq_str(res_multi_fallback[0], "Rune", "First choice selected as fallback")
+
+# Empty choices list
+empty_in: list[str] = []
+res_empty: list[str] = select_multiple("Empty", empty_in, None, test_con)
+nox.test.assert_eq_int(len(res_empty), 0, "Empty choices returns empty list")
+
+print("prompt_advanced_test passed")

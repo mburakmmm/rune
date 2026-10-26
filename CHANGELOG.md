@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-10-26
+
+### Added
+- **Validated Integer Input (`prompt_int`)**:
+  - `prompt_int(question, default_val, min_val, max_val, max_retries, console)`: validates integer format with whitespace trimming.
+  - Range validation with `min_val` and `max_val` bounds checks.
+  - Interactive retry loop with clear error feedback, bounded by `max_retries` before raising `PromptError`.
+- **Multi-Select Prompt (`select_multiple`)**:
+  - `select_multiple(question, choices, default_selected, console)`: allows selecting zero, one, or multiple items.
+  - Accepts comma-separated numbers (e.g. `1, 3`), exact item names, or keyword `all`.
+  - Gracefully falls back to `default_selected` when enter is pressed without input.
+- **Unit Tests**:
+  - `tests/unit/prompt_advanced_test.nox` testing numeric range validation, retry logic, and multi-selection parsing.
+
+---
+
 ## [0.4.0] - 2026-10-26
 
 ### Added

@@ -1,2 +1,2 @@
 import prompt
-from prompt import prompt_text, confirm, select_choice, prompt_password, PromptError, NonInteractiveError
+from prompt import prompt_text, prompt_int, confirm, select_choice, select_multiple, prompt_password, PromptError, NonInteractiveError
