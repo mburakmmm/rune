@@ -18,25 +18,23 @@ class TreeNode:
         self.children = []
 
     def add(self: TreeNode, label: str, style: Style | None = None) -> TreeNode:
+
         child: TreeNode = TreeNode(label, style)
         self.children.append(child)
         return child
 
     def add_node(self: TreeNode, child: TreeNode) -> TreeNode:
+
         self.children.append(child)
         return child
 
+@dataclass
+@derive("copy")
 class TreeItem:
     node: TreeNode
     prefix: str
     is_last: bool
     is_root: bool
-
-    def __init__(self: TreeItem, node: TreeNode, prefix: str, is_last: bool, is_root: bool) -> None:
-        self.node = node
-        self.prefix = prefix
-        self.is_last = is_last
-        self.is_root = is_root
 
 class Tree:
     root: TreeNode
@@ -50,9 +48,24 @@ class Tree:
             self.guide_style = Style()
 
     def add(self: Tree, label: str, style: Style | None = None) -> TreeNode:
+
         return self.root.add(label, style)
 
+    def walk(self: Tree) -> Iterator[TreeNode]:
+
+        stack: list[TreeNode] = [self.root]
+        visited: int = 0
+        while len(stack) > 0 and visited < 10000:
+            visited = visited + 1
+            node: TreeNode = stack.pop()
+            yield node
+            c_idx: int = len(node.children) - 1
+            while c_idx >= 0:
+                stack.append(node.children[c_idx])
+                c_idx = c_idx - 1
+
     def render(self: Tree, options: ConsoleOptions) -> str:
+
         use_ascii: bool = not options.supports_unicode
         branch_char: str = "├── "
         last_char: str = "└── "
@@ -107,7 +120,7 @@ class Tree:
                 ci: int = c_count - 1
                 while ci >= 0:
                     child_node: TreeNode = node.children[ci]
-                    child_is_last: bool = (ci == c_count - 1)
+                    child_is_last: bool = ci == c_count - 1
                     stack.append(TreeItem(child_node, child_prefix, child_is_last, False))
                     ci = ci - 1
 

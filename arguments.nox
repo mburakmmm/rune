@@ -1,31 +1,42 @@
-# arguments.nox — Positional argument declarations, type codes, and choice constraints.
+# arguments.nox — Positional argument declarations, typed ArgType enum, and choice constraints.
 
-TYPE_STR: int = 1
-TYPE_INT: int = 2
-TYPE_FLOAT: int = 3
-TYPE_BOOL: int = 4
+enum ArgType:
+    Str
+    Int
+    Float
+    Bool
+
+TYPE_STR: ArgType = ArgType.Str
+TYPE_INT: ArgType = ArgType.Int
+TYPE_FLOAT: ArgType = ArgType.Float
+TYPE_BOOL: ArgType = ArgType.Bool
+
+def arg_type_name(t: ArgType) -> str:
+    match t:
+        case ArgType.Str:
+            return "str"
+        case ArgType.Int:
+            return "int"
+        case ArgType.Float:
+            return "float"
+        case ArgType.Bool:
+            return "bool"
 
 class Argument:
     name: str
-    arg_type: int
+    arg_type: ArgType
     required: bool
     default_val: str
     help: str
     variadic: bool
     choices: list[str]
 
-    def __init__(
-        self: Argument,
-        name: str,
-        arg_type: int = 1,
-        required: bool = True,
-        default_val: str = "",
-        help: str = "",
-        variadic: bool = False,
-        choices: list[str] | None = None
-    ) -> None:
+    def __init__(self: Argument, name: str, arg_type: ArgType | None = None, required: bool = True, default_val: str = "", help: str = "", variadic: bool = False, choices: list[str] | None = None) -> None:
         self.name = name
-        self.arg_type = arg_type
+        if arg_type is not None:
+            self.arg_type = arg_type
+        else:
+            self.arg_type = ArgType.Str
         self.required = required
         self.default_val = default_val
         self.help = help

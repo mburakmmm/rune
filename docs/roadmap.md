@@ -21,3 +21,5 @@
 - **v1.2.0 (Phase 8) — Geometry & Flex Layout:** Completed & Published.
 - **v1.3.0 (Phase 9) — Declarative TUI Widgets:** Completed & Published.
 - **v1.4.0 (Phase 10) — Event Loop & Interactive App Runner:** Completed & Published.
+- **v1.5.0 (Phase 11) — Real Terminal Runtime & Nox Stdlib Integration (Path A):** Completed (`nox.terminal`, `nox.signal`, `nox.time`, `nox.unicode`, `nox.property`).
+- **v2.0.0 (Phase 12) — Nox 2.1 Language & Perf Modernization (Path B):** Completed & Verified (`enum`/`match`, `@dataclass`, `@property`, `*args`, `with`/`__del__`, `yield`, `nox.regex`).

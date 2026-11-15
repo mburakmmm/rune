@@ -43,13 +43,13 @@ except NonInteractiveError:
     sel_err = True
 nox.test.assert_true(sel_err, "select_choice without default must raise NonInteractiveError in CI")
 
-# 5. prompt_password must raise PromptError
+# 5. prompt_password must raise NonInteractiveError/PromptError in non-TTY mode
 pw_caught: bool = False
 try:
-    prompt_password("Enter password: ")
+    prompt_password("Enter password: ", ci_con)
 except PromptError:
     pw_caught = True
 
-nox.test.assert_true(pw_caught, "prompt_password must raise PromptError due to runtime limitation")
+nox.test.assert_true(pw_caught, "prompt_password must raise PromptError in non-TTY environment")
 
 print("prompt_test passed")

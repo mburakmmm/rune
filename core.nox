@@ -3,6 +3,8 @@
 import nox.strings
 import nox.os
 from nox.os import OsError
+import nox.terminal
+import nox.unicode
 
 # ASCII Escape Byte
 def esc_code() -> str:
@@ -63,7 +65,7 @@ def _is_hex_char(ch: str) -> bool:
     if len(ch) != 1:
         return False
     b: int = ord(ch)
-    return (b >= 48 and b <= 57) or (b >= 65 and b <= 70) or (b >= 97 and b <= 102)
+    return b >= 48 and b <= 57 or b >= 65 and b <= 70 or b >= 97 and b <= 102
 
 def _hex_digit(ch: str) -> int:
     b: int = ord(ch)
@@ -181,16 +183,7 @@ def resolve_bg_code(name: str) -> str:
     return ""
 
 class Style:
-    def __init__(
-        self: Style,
-        fg: str = "",
-        bg: str = "",
-        bold: bool = False,
-        dim: bool = False,
-        italic: bool = False,
-        underline: bool = False,
-        reverse: bool = False
-    ) -> None:
+    def __init__(self: Style, fg: str = "", bg: str = "", bold: bool = False, dim: bool = False, italic: bool = False, underline: bool = False, reverse: bool = False) -> None:
         self.fg = fg
         self.bg = bg
         self.bold = bold
@@ -200,6 +193,7 @@ class Style:
         self.reverse = reverse
 
     def is_plain(self: Style) -> bool:
+
         if len(self.fg) > 0:
             return False
         if len(self.bg) > 0:
@@ -209,6 +203,7 @@ class Style:
         return True
 
     def to_ansi(self: Style) -> str:
+
         if self.is_plain():
             return ""
         codes: list[str] = []
@@ -242,6 +237,7 @@ class Style:
         return esc_code() + "[" + nox.strings.join(codes, ";") + "m"
 
     def apply(self: Style, text: str) -> str:
+
         if self.is_plain() or len(text) == 0:
             return text
         return self.to_ansi() + text + reset_code()
@@ -250,11 +246,14 @@ def strip_ansi(s: str) -> str:
     n: int = len(s)
     if n == 0:
         return ""
-    out: str = ""
+    parts: list[str] = []
+    span_start: int = 0
     i: int = 0
     while i < n:
         code: int = ord(s[i])
-        if code == 27: # ESC
+        if code == 27:
+            if i > span_start:
+                parts.append(s[span_start:i])
             i = i + 1
             if i < n:
                 next_ch: str = s[i]
@@ -267,7 +266,6 @@ def strip_ansi(s: str) -> str:
                             break
                         i = i + 1
                 elif next_ch == "]":
-                    # OSC sequence (ends with BEL 7 or ST ESC \)
                     i = i + 1
                     while i < n:
                         cb: int = ord(s[i])
@@ -280,23 +278,32 @@ def strip_ansi(s: str) -> str:
                         i = i + 1
                 else:
                     i = i + 1
+            span_start = i
         else:
-            out = out + s[i]
             i = i + 1
-    return out
+    if span_start == 0:
+        return s
+    if span_start < n:
+        parts.append(s[span_start:n])
+    if len(parts) == 0:
+        return ""
+    return nox.strings.join(parts, "")
 
 def sanitize_ansi(s: str) -> str:
     # Completely strips escape codes, C0 controls (except \n, \t), C1 controls (128-159), and standalone \r
     n: int = len(s)
     if n == 0:
         return ""
-    out: str = ""
+    parts: list[str] = []
+    span_start: int = 0
     i: int = 0
     while i < n:
         code: int = ord(s[i])
 
         # 1. ESC sequences
         if code == 27:
+            if i > span_start:
+                parts.append(s[span_start:i])
             i = i + 1
             if i < n:
                 next_ch: str = s[i]
@@ -321,52 +328,76 @@ def sanitize_ansi(s: str) -> str:
                         i = i + 1
                 else:
                     i = i + 1
+            span_start = i
             continue
 
         # 2. C1 control codes (0x80 to 0x9F / 128 to 159) & DEL (127)
-        if code == 127 or (code >= 128 and code <= 159):
+        if code == 127 or code >= 128 and code <= 159:
+            if i > span_start:
+                parts.append(s[span_start:i])
             i = i + 1
+            span_start = i
             continue
 
         # 3. Carriage return handling (\r\n -> \n, standalone \r dropped to prevent line overwrite spoofing)
         if code == 13:
+            if i > span_start:
+                parts.append(s[span_start:i])
             if i + 1 < n and ord(s[i + 1]) == 10:
-                out = out + "\n"
+                parts.append("\n")
                 i = i + 2
             else:
                 i = i + 1
+            span_start = i
             continue
 
         # 4. Other C0 control characters (reject all < 32 except \n and \t)
         if code < 32 and code != 10 and code != 9:
+            if i > span_start:
+                parts.append(s[span_start:i])
             i = i + 1
+            span_start = i
             continue
 
-        out = out + s[i]
         i = i + 1
 
-    return out
+    if span_start == 0:
+        return s
+    if span_start < n:
+        parts.append(s[span_start:n])
+    if len(parts) == 0:
+        return ""
+    return nox.strings.join(parts, "")
 
 def char_width(c: str) -> int:
     cp: int = ord(c)
     # C0, C1, and DEL controls
-    if cp < 32 or (cp >= 127 and cp <= 159):
+    if cp < 32 or cp >= 127 and cp <= 159:
         return 0
     # Zero width combining & format characters (VS1-16, ZWJ, ZWNJ, etc.)
-    if (cp >= 768 and cp <= 879) or (cp >= 6832 and cp <= 6911) or (cp >= 7616 and cp <= 7679) or (cp >= 8400 and cp <= 8447) or (cp >= 65024 and cp <= 65039) or (cp >= 65056 and cp <= 65071):
+    if cp >= 768 and cp <= 879 or cp >= 6832 and cp <= 6911 or cp >= 7616 and cp <= 7679 or cp >= 8400 and cp <= 8447 or cp >= 65024 and cp <= 65039 or cp >= 65056 and cp <= 65071:
         return 0
     if cp == 8203 or cp == 8204 or cp == 8205 or cp == 8206 or cp == 8207:
         return 0
     # CJK Wide and Fullwidth characters (width 2)
-    if (cp >= 4352 and cp <= 4447) or (cp >= 11904 and cp <= 12287) or (cp >= 12288 and cp <= 12350) or (cp >= 12352 and cp <= 12543) or (cp >= 12592 and cp <= 12799) or (cp >= 13312 and cp <= 19903) or (cp >= 19968 and cp <= 40959) or (cp >= 43360 and cp <= 43391) or (cp >= 44032 and cp <= 55203) or (cp >= 55216 and cp <= 55295) or (cp >= 63744 and cp <= 64255) or (cp >= 65281 and cp <= 65376) or (cp >= 65504 and cp <= 65510) or (cp >= 131072 and cp <= 262141):
+    if cp >= 4352 and cp <= 4447 or cp >= 11904 and cp <= 12287 or cp >= 12288 and cp <= 12350 or cp >= 12352 and cp <= 12543 or cp >= 12592 and cp <= 12799 or cp >= 13312 and cp <= 19903 or cp >= 19968 and cp <= 40959 or cp >= 43360 and cp <= 43391 or cp >= 44032 and cp <= 55203 or cp >= 55216 and cp <= 55295 or cp >= 63744 and cp <= 64255 or cp >= 65281 and cp <= 65376 or cp >= 65504 and cp <= 65510 or cp >= 131072 and cp <= 262141:
         return 2
     # Emojis and Pictographs (width 2 in modern terminals)
-    if (cp >= 127744 and cp <= 128767) or (cp >= 128512 and cp <= 128591) or (cp >= 128640 and cp <= 128767) or (cp >= 129280 and cp <= 129535) or (cp >= 129648 and cp <= 129791) or (cp >= 9728 and cp <= 10175):
+    if cp >= 127744 and cp <= 128767 or cp >= 128512 and cp <= 128591 or cp >= 128640 and cp <= 128767 or cp >= 129280 and cp <= 129535 or cp >= 129648 and cp <= 129791 or cp >= 9728 and cp <= 10175:
         return 2
     return 1
 
+def normalize_text(s: str, form: str = "NFC") -> str:
+    return nox.unicode.normalize(s, form)
+
+def upper_tr(s: str) -> str:
+    return nox.unicode.upper_tr(s)
+
+def lower_tr(s: str) -> str:
+    return nox.unicode.lower_tr(s)
+
 def cell_width(s: str) -> int:
-    clean: str = strip_ansi(s)
+    clean: str = nox.unicode.normalize(strip_ansi(s), "NFC")
     w: int = 0
     i: int = 0
     n: int = len(clean)
@@ -482,17 +513,10 @@ class ConsoleOptions:
     is_tty: bool
     capture: bool
     supports_ansi: bool
+    color_depth: int
+    supports_truecolor: bool
 
-    def __init__(
-        self: ConsoleOptions,
-        supports_color: bool = True,
-        supports_unicode: bool = True,
-        width: int = 80,
-        height: int = 24,
-        is_tty: bool = True,
-        capture: bool = False,
-        supports_ansi: bool = True
-    ) -> None:
+    def __init__(self: ConsoleOptions, supports_color: bool = True, supports_unicode: bool = True, width: int = 80, height: int = 24, is_tty: bool = True, capture: bool = False, supports_ansi: bool = True, color_depth: int = -1, supports_truecolor: bool = False) -> None:
         self.supports_color = supports_color
         self.supports_unicode = supports_unicode
         self.width = width
@@ -500,79 +524,80 @@ class ConsoleOptions:
         self.is_tty = is_tty
         self.capture = capture
         self.supports_ansi = supports_ansi
+        if color_depth >= 0:
+            self.color_depth = color_depth
+            self.supports_truecolor = supports_truecolor or color_depth >= 16777216
+        elif not supports_color:
+            self.color_depth = 0
+            self.supports_truecolor = False
+        elif supports_truecolor:
+            self.color_depth = 16777216
+            self.supports_truecolor = True
+        else:
+            self.color_depth = 16
+            self.supports_truecolor = False
+
+    @property
+    def is_plain(self: ConsoleOptions) -> bool:
+
+        return not self.supports_color and not self.supports_ansi
 
 def detect_console_options() -> ConsoleOptions:
-    # 1. Check NO_COLOR (takes high precedence)
+    caps: nox.terminal.TerminalCapabilities = nox.terminal.get_capabilities()
+    sz: nox.terminal.TerminalSize = nox.terminal.get_size()
+
     no_color: str | None = get_env_safe("NO_COLOR")
     force_color: str | None = get_env_safe("CLICOLOR_FORCE")
     term: str | None = get_env_safe("TERM")
     ci: str | None = get_env_safe("CI")
 
-    # Windows terminal environment detection
     os_env: str | None = get_env_safe("OS")
     wt_session: str | None = get_env_safe("WT_SESSION")
     ansicon: str | None = get_env_safe("ANSICON")
     conemu: str | None = get_env_safe("ConEmuANSI")
 
-    supports_color: bool = True
-    supports_unicode: bool = True
-    supports_ansi: bool = True
-
-    if os_env is not None:
-        if os_env == "Windows_NT":
-            is_modern_win: bool = False
-            if wt_session is not None:
-                is_modern_win = True
-            else:
-                if ansicon is not None:
-                    is_modern_win = True
-                else:
-                    if conemu is not None:
-                        is_modern_win = True
-
-            if not is_modern_win:
-                supports_unicode = False
-                supports_color = False
-                supports_ansi = False
-
-    if no_color is not None:
-        if len(no_color) > 0:
-            supports_color = False
-    else:
-        if force_color is not None:
-            if force_color == "1":
-                supports_color = True
-        else:
-            if term is not None:
-                if term == "dumb":
-                    supports_color = False
-                    supports_ansi = False
-
-    is_tty: bool = True
-    if ci is not None:
+    is_tty: bool = caps.is_tty
+    if ci is not None and len(ci) > 0:
         is_tty = False
 
-    term_width: int = 80
-    cols_env: str | None = get_env_safe("COLUMNS")
-    if cols_env is not None:
-        try:
-            cw_val: int = int(nox.strings.trim(cols_env))
-            if cw_val > 0:
-                term_width = cw_val
-        except ValueError:
-            pass
+    supports_ansi: bool = caps.supports_ansi
+    supports_color: bool = caps.supports_ansi
+    supports_unicode: bool = True
+    color_depth: int = caps.color_depth
+    supports_truecolor: bool = caps.supports_truecolor
 
-    term_height: int = 24
-    lines_env: str | None = get_env_safe("LINES")
-    if lines_env is not None:
-        try:
-            ch_val: int = int(nox.strings.trim(lines_env))
-            if ch_val > 0:
-                term_height = ch_val
-        except ValueError:
-            pass
+    if os_env is not None and os_env == "Windows_NT":
+        is_modern_win: bool = wt_session is not None or ansicon is not None or conemu is not None
+        if not is_modern_win:
+            supports_unicode = False
+            supports_color = False
+            supports_ansi = False
+            color_depth = 0
+            supports_truecolor = False
 
-    return ConsoleOptions(supports_color, supports_unicode, term_width, term_height, is_tty, False, supports_ansi)
+    if no_color is not None and len(no_color) > 0:
+        supports_color = False
+        color_depth = 0
+        supports_truecolor = False
+    elif force_color is not None and force_color == "1":
+        supports_color = True
+        supports_ansi = True
+        if color_depth == 0:
+            color_depth = 16
+    elif term is not None and term == "dumb":
+        supports_color = False
+        supports_ansi = False
+        color_depth = 0
+        supports_truecolor = False
+
+    term_width: int = sz.cols
+    if term_width <= 0:
+        term_width = 80
+    term_height: int = sz.rows
+    if term_height <= 0:
+        term_height = 24
+
+    return ConsoleOptions(supports_color, supports_unicode, term_width, term_height, is_tty, False, supports_ansi, color_depth, supports_truecolor)
 
 class Console:
     options: ConsoleOptions
@@ -586,6 +611,7 @@ class Console:
         self.buffer = ""
 
     def print(self: Console, text: str = "") -> None:
+
         if not self.options.supports_color:
             text = strip_ansi(text)
         if self.options.capture:
@@ -594,30 +620,42 @@ class Console:
             print(text)
 
     def print_styled(self: Console, text: str, style: Style) -> None:
+
         if self.options.supports_color:
             self.print(style.apply(text))
         else:
             self.print(text)
 
+    def print_items(self: Console, *items: str) -> None:
+
+        parts: list[str] = []
+        for it in items:
+            parts.append(it)
+        self.print(nox.strings.join(parts, " "))
+
     def write(self: Console, text: str) -> None:
+
         if not self.options.supports_color:
             text = strip_ansi(text)
         if self.options.capture:
             self.buffer = self.buffer + text
         else:
-            # nox doesn't have sys.stdout.write, print writes with newline.
-            # In capture mode write appends directly.
-            self.buffer = self.buffer + text
+            nox.terminal.write_raw(text)
+            nox.terminal.flush()
 
     def get_captured(self: Console) -> str:
+
         return self.buffer
 
     def clear_captured(self: Console) -> None:
+
         self.buffer = ""
 
     def set_color(self: Console, enabled: bool) -> None:
+
         self.options.supports_color = enabled
 
     def set_width(self: Console, width: int) -> None:
+
         if width > 0:
             self.options.width = width

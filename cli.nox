@@ -5,7 +5,7 @@ import nox.os
 import core
 from core import Console, Style, cell_width, get_env_safe
 import arguments
-from arguments import Argument, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+from arguments import Argument, ArgType, arg_type_name, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
 import options
 from options import Option
 import errors
@@ -24,9 +24,11 @@ class CliContext:
         self.flags = {}
 
     def set_value(self: CliContext, key: str, val: str) -> None:
+
         self.values[key] = val
 
     def append_list_value(self: CliContext, key: str, val: str) -> None:
+
         if key in self.list_values:
             self.list_values[key].append(val)
         else:
@@ -34,14 +36,17 @@ class CliContext:
             self.list_values[key] = new_list
 
     def set_flag(self: CliContext, key: str, val: bool) -> None:
+
         self.flags[key] = val
 
     def get_str(self: CliContext, key: str, fallback: str = "") -> str:
+
         if key in self.values:
             return self.values[key]
         return fallback
 
     def get_int(self: CliContext, key: str, fallback: int = 0) -> int:
+
         if key in self.values:
             try:
                 return int(nox.strings.trim(self.values[key]))
@@ -50,6 +55,7 @@ class CliContext:
         return fallback
 
     def get_float(self: CliContext, key: str, fallback: float = 0.0) -> float:
+
         if key in self.values:
             try:
                 return float(nox.strings.trim(self.values[key]))
@@ -58,6 +64,7 @@ class CliContext:
         return fallback
 
     def get_bool(self: CliContext, key: str, fallback: bool = False) -> bool:
+
         if key in self.flags:
             return self.flags[key]
         if key in self.values:
@@ -69,6 +76,7 @@ class CliContext:
         return fallback
 
     def get_list(self: CliContext, key: str) -> list[str]:
+
         if key in self.list_values:
             return self.list_values[key]
         empty: list[str] = []
@@ -102,9 +110,11 @@ class Command:
         self.aliases = []
 
     def add_alias(self: Command, alias: str) -> None:
+
         self.aliases.append(alias)
 
     def has_alias(self: Command, alias: str) -> bool:
+
         i: int = 0
         while i < len(self.aliases):
             if self.aliases[i] == alias:
@@ -112,42 +122,24 @@ class Command:
             i = i + 1
         return False
 
-    def add_argument(
-        self: Command,
-        name: str,
-        arg_type: int = 1,
-        required: bool = True,
-        default_val: str = "",
-        help: str = "",
-        variadic: bool = False,
-        choices: list[str] | None = None
-    ) -> Argument:
+    def add_argument(self: Command, name: str, arg_type: ArgType | None = None, required: bool = True, default_val: str = "", help: str = "", variadic: bool = False, choices: list[str] | None = None) -> Argument:
+
         arg: Argument = Argument(name, arg_type, required, default_val, help, variadic, choices)
         self.arguments.append(arg)
         return arg
 
-    def add_option(
-        self: Command,
-        name: str,
-        short_name: str = "",
-        opt_type: int = 1,
-        is_flag: bool = False,
-        required: bool = False,
-        default_val: str = "",
-        help: str = "",
-        choices: list[str] | None = None,
-        env_var: str = "",
-        multiple: bool = False,
-        is_secret: bool = False
-    ) -> Option:
+    def add_option(self: Command, name: str, short_name: str = "", opt_type: ArgType | None = None, is_flag: bool = False, required: bool = False, default_val: str = "", help: str = "", choices: list[str] | None = None, env_var: str = "", multiple: bool = False, is_secret: bool = False) -> Option:
+
         opt: Option = Option(name, short_name, opt_type, is_flag, required, default_val, help, choices, env_var, multiple, is_secret)
         self.options.append(opt)
         return opt
 
     def add_subcommand(self: Command, sub: Command) -> None:
+
         self.subcommands.append(sub)
 
     def get_subcommand(self: Command, name: str) -> Command | None:
+
         i: int = 0
         while i < len(self.subcommands):
             sub: Command = self.subcommands[i]
@@ -157,6 +149,7 @@ class Command:
         return None
 
     def find_option_by_long(self: Command, name: str) -> Option | None:
+
         i: int = 0
         while i < len(self.options):
             if self.options[i].name == name:
@@ -165,6 +158,7 @@ class Command:
         return None
 
     def find_option_by_short(self: Command, short_name: str) -> Option | None:
+
         i: int = 0
         while i < len(self.options):
             if self.options[i].short_name == short_name:
@@ -173,6 +167,7 @@ class Command:
         return None
 
     def format_help(self: Command, console: Console) -> str:
+
         lines: list[str] = []
         bold: Style = Style("", "", True)
 
@@ -294,15 +289,7 @@ class CliResult:
     version_requested: bool
     error_message: str
 
-    def __init__(
-        self: CliResult,
-        command: Command,
-        context: CliContext,
-        exit_code: int = 0,
-        help_requested: bool = False,
-        version_requested: bool = False,
-        error_message: str = ""
-    ) -> None:
+    def __init__(self: CliResult, command: Command, context: CliContext, exit_code: int = 0, help_requested: bool = False, version_requested: bool = False, error_message: str = "") -> None:
         self.command = command
         self.context = context
         self.exit_code = exit_code
@@ -311,6 +298,7 @@ class CliResult:
         self.error_message = error_message
 
     def is_success(self: CliResult) -> bool:
+
         return self.exit_code == 0
 
 class CliApp:
@@ -327,6 +315,7 @@ class CliApp:
             self.console = Console()
 
     def parse(self: CliApp, raw_args: list[str]) -> CliResult:
+
         current_cmd: Command = self.root
         tokens: list[str] = raw_args
         ctx: CliContext = CliContext()
@@ -424,7 +413,7 @@ class CliApp:
             if nox.strings.starts_with(tok, "-") and len(tok) > 1:
                 first_ch: str = tok[1]
                 b_val: int = nox.strings.byte_at(first_ch, 0)
-                if b_val >= 48 and b_val <= 57: # '0' to '9' (negative number)
+                if b_val >= 48 and b_val <= 57:  # '0' to '9' (negative number)
                     pos_tokens.append(tok)
                     i = i + 1
                     continue
@@ -502,16 +491,21 @@ class CliApp:
             else:
                 if p_idx < len(pos_tokens):
                     val_token: str = pos_tokens[p_idx]
-                    if arg_def.arg_type == TYPE_INT:
-                        try:
-                            discard_i: int = int(nox.strings.trim(val_token))
-                        except ValueError:
-                            return CliResult(current_cmd, ctx, 2, False, False, "Invalid integer for argument '" + arg_def.name + "': " + val_token)
-                    elif arg_def.arg_type == TYPE_FLOAT:
-                        try:
-                            discard_f: float = float(nox.strings.trim(val_token))
-                        except ValueError:
-                            return CliResult(current_cmd, ctx, 2, False, False, "Invalid float for argument '" + arg_def.name + "': " + val_token)
+                    match arg_def.arg_type:
+                        case ArgType.Int:
+                            try:
+                                discard_i: int = int(nox.strings.trim(val_token))
+                            except ValueError:
+                                return CliResult(current_cmd, ctx, 2, False, False, "Invalid integer for argument '" + arg_def.name + "': " + val_token)
+                        case ArgType.Float:
+                            try:
+                                discard_f: float = float(nox.strings.trim(val_token))
+                            except ValueError:
+                                return CliResult(current_cmd, ctx, 2, False, False, "Invalid float for argument '" + arg_def.name + "': " + val_token)
+                        case ArgType.Str:
+                            pass
+                        case ArgType.Bool:
+                            pass
 
                     if len(arg_def.choices) > 0 and not _is_in_choices(val_token, arg_def.choices):
                         return CliResult(current_cmd, ctx, 2, False, False, "Invalid value for <" + arg_def.name + ">: '" + val_token + "' is not one of " + _format_choices(arg_def.choices))
@@ -574,6 +568,7 @@ class CliApp:
         return CliResult(current_cmd, ctx, 0, False, False, "")
 
     def run(self: CliApp, argv: list[str] | None = None) -> int:
+
         args_to_parse: list[str] = []
         if argv is not None:
             args_to_parse = argv

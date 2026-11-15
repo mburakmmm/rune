@@ -1,0 +1,158 @@
+# tests/unit/modern_v2_test.nox — Unit tests for Rune v2.0.0 Path B Nox 2.1 modernization features.
+
+import nox.test
+import nox.strings
+import rune
+from rune import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi
+from rune import Table, Tree, TreeNode, Markdown, Syntax
+from rune import Task, ProgressBar, Live, track, track_range
+from rune import Argument, ArgType, arg_type_name, Option, Command, CliApp, CliResult
+from rune import Cell, ScreenBuffer, MockTerminalDriver, TerminalSession
+from rune import Size, Padding, Rect, Constraint, ConstraintKind, Direction, Layout
+from rune import length_constraint, percentage_constraint, min_constraint
+from rune import Frame, Event, EventKind, make_key_event, make_tick_event
+
+# 1. Strongly-typed enums + match dispatch
+nox.test.assert_eq_str(arg_type_name(ArgType.Str), "str", "ArgType.Str name")
+nox.test.assert_eq_str(arg_type_name(ArgType.Int), "int", "ArgType.Int name")
+nox.test.assert_eq_str(arg_type_name(ArgType.Float), "float", "ArgType.Float name")
+nox.test.assert_eq_str(arg_type_name(ArgType.Bool), "bool", "ArgType.Bool name")
+
+cli_cmd: Command = Command("v2cmd")
+cli_cmd.add_argument("count", ArgType.Int, True)
+cli_cmd.add_option("rate", "r", ArgType.Float, False, False, "1.5")
+app: CliApp = CliApp(cli_cmd, "2.0.0")
+res_ok: CliResult = app.parse(["42", "--rate", "2.25"])
+nox.test.assert_eq_int(res_ok.exit_code, 0, "CliApp parses ArgType.Int and ArgType.Float")
+nox.test.assert_eq_int(res_ok.context.get_int("count"), 42, "Parsed ArgType.Int value")
+
+# 2. EventKind enum matching
+ke: Event = make_key_event("q", True)
+te: Event = make_tick_event(16)
+nox.test.assert_true(ke.type == EventKind.Key, "EventKind.Key variant")
+nox.test.assert_true(te.type == EventKind.Tick, "EventKind.Tick variant")
+nox.test.assert_true(ke.is_ctrl("q"), "Key event ctrl check with enum")
+nox.test.assert_true(not te.is_key("q"), "Tick event is not key via match")
+
+# 3. @dataclass / @derive("copy", "order") + @property + *args Layout
+s1: Size = Size(10, 20)
+s2: Size = s1.copy()
+s3: Size = Size(15, 20)
+nox.test.assert_true(s1 == s2, "Size dataclass copy equality")
+nox.test.assert_true(s1 < s3, "Size dataclass derived order comparison")
+
+pad: Padding = Padding(1, 2, 1, 2)
+outer: Rect = Rect(10, 5, 40, 20)
+nox.test.assert_eq_int(outer.right, 50, "Rect.right @property")
+nox.test.assert_eq_int(outer.bottom, 25, "Rect.bottom @property")
+nox.test.assert_true(not outer.empty, "Rect.empty @property false on non-empty rect")
+nox.test.assert_eq_int(outer.bounds.width, 40, "Rect.bounds @property")
+
+inner: Rect = outer.inner_padding(pad)
+nox.test.assert_eq_int(inner.x, 12, "Padding left offset")
+nox.test.assert_eq_int(inner.y, 6, "Padding top offset")
+nox.test.assert_eq_int(inner.width, 36, "Padding width reduction")
+nox.test.assert_eq_int(inner.height, 18, "Padding height reduction")
+
+c_len: Constraint = length_constraint(8)
+c_min: Constraint = min_constraint(4)
+nox.test.assert_true(c_len.is_fixed, "ConstraintKind.Length is_fixed")
+nox.test.assert_true(not c_min.is_fixed, "ConstraintKind.Min is not fixed")
+
+lay: Layout = Layout(Direction.Horizontal)
+chunks: list[Rect] = lay.split_constraints(Rect(0, 0, 100, 10), length_constraint(25), percentage_constraint(50), min_constraint(10))
+nox.test.assert_eq_int(len(chunks), 3, "Variadic Layout.split_constraints produces 3 chunks")
+nox.test.assert_eq_int(chunks[0].width, 25, "First constraint chunk width")
+nox.test.assert_eq_int(chunks[1].width, 50, "Second constraint chunk width")
+nox.test.assert_eq_int(chunks[2].width, 25, "Third constraint chunk absorbs remaining space")
+
+# 4. @property + *args on ConsoleOptions, Console, Table
+opts_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True, False)
+nox.test.assert_true(opts_plain.is_plain, "ConsoleOptions.is_plain @property")
+con: Console = Console(opts_plain)
+con.print_items("v2", "ready", "!")
+nox.test.assert_true(nox.strings.contains(con.get_captured(), "v2 ready !"), "Console.print_items variadic output")
+
+tbl: Table = Table("Nodes")
+tbl.add_column("ID", "left")
+tbl.add_column("State", "center")
+tbl.add_cells("n1", "UP")
+rendered_tbl: str = tbl.render(opts_plain)
+nox.test.assert_true(nox.strings.contains(rendered_tbl, "n1") and nox.strings.contains(rendered_tbl, "UP"), "Table.add_cells variadic row")
+
+# 5. Context managers: with Live(...) & with TerminalSession(...)
+con_live: Console = Console(opts_plain)
+with Live(con_live, True) as live:
+    nox.test.assert_true(live.active, "Live active inside with block")
+    live.update("building...")
+nox.test.assert_true(not live.active, "Live stopped cleanly on __exit__")
+nox.test.assert_true(nox.strings.contains(con_live.get_captured(), "building..."), "Live captured update inside with")
+
+mock_drv: MockTerminalDriver = MockTerminalDriver(40, 12)
+with TerminalSession(mock_drv, False, True, True) as sess:
+    nox.test.assert_true(sess.is_open, "TerminalSession.is_open inside with")
+    nox.test.assert_true(mock_drv.is_alt_screen, "Driver enters alt screen inside with")
+nox.test.assert_true(not sess.is_open, "TerminalSession closed on __exit__")
+nox.test.assert_true(not mock_drv.is_alt_screen, "Driver leaves alt screen on __exit__")
+
+# 6. Frame @property & ScreenBuffer.iter_cells() yield generator
+buf: ScreenBuffer = ScreenBuffer(4, 2)
+buf.write_string(0, 0, "HI")
+frame: Frame = Frame(buf)
+nox.test.assert_eq_int(frame.bounds.width, 4, "Frame.bounds width")
+nox.test.assert_true(not frame.is_clipped, "Frame.is_clipped false initially")
+frame.push_clip(Rect(0, 0, 2, 1))
+nox.test.assert_true(frame.is_clipped, "Frame.is_clipped true after push_clip")
+frame.pop_clip()
+
+cell_count: int = 0
+found_h: bool = False
+for cell in buf.iter_cells():
+    cell_count = cell_count + 1
+    if cell.char == "H":
+        found_h = True
+nox.test.assert_eq_int(cell_count, 8, "ScreenBuffer.iter_cells yields all 4x2 cells")
+nox.test.assert_true(found_h, "ScreenBuffer.iter_cells contains written char")
+
+# 7. Yield generators: track, track_range & Tree.walk()
+tracked_items: list[str] = []
+con_track: Console = Console(opts_plain)
+for item in track(["a", "b", "c"], "Sync", con_track):
+    tracked_items.append(item)
+nox.test.assert_eq_int(len(tracked_items), 3, "track yields all items lazily")
+nox.test.assert_eq_str(tracked_items[1], "b", "track preserves element order")
+nox.test.assert_true(nox.strings.contains(con_track.get_captured(), "100%"), "track renders completion")
+
+steps_seen: list[int] = []
+con_steps: Console = Console(opts_plain)
+for idx_step in track_range(3, "Steps", con_steps):
+    steps_seen.append(idx_step)
+nox.test.assert_eq_int(len(steps_seen), 3, "track_range yields 3 steps")
+nox.test.assert_eq_int(steps_seen[2], 2, "track_range final index")
+
+tr_obj: Tree = Tree("root")
+b1: TreeNode = tr_obj.add("child1")
+b1.add("leaf1")
+tr_obj.add("child2")
+walked_labels: list[str] = []
+for node in tr_obj.walk():
+    walked_labels.append(node.label)
+nox.test.assert_eq_int(len(walked_labels), 4, "Tree.walk yields root + 3 descendants")
+nox.test.assert_eq_str(walked_labels[0], "root", "Tree.walk starts at root")
+
+# 8. Task @property accessors & slice/regex Markdown/Syntax hot paths
+pb: ProgressBar = ProgressBar(10)
+t_prop: Task = pb.add_task("Task", 4)
+t_prop.update(2)
+nox.test.assert_true(not t_prop.done, "Task.done false at 50%")
+nox.test.assert_true(t_prop.ratio > 0.49 and t_prop.ratio < 0.51, "Task.ratio at 50%")
+t_prop.update(4)
+nox.test.assert_true(t_prop.done, "Task.done true at 100%")
+
+md_out: str = Markdown("10. Ordered item with **bold** and `code`\n1abc. Not list").render(opts_plain)
+nox.test.assert_true(nox.strings.contains(md_out, "10. Ordered item"), "nox.regex matches ordered list items")
+
+syn_out: str = Syntax("x = 123   # comment", "nox", False).render(opts_plain)
+nox.test.assert_true(nox.strings.contains(syn_out, "123   # comment"), "Syntax slice scanner preserves whitespace & comment")
+
+print("modern_v2_test passed")

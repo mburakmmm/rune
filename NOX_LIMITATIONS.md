@@ -1,6 +1,15 @@
 # NOX Runtime & Compiler Requirements for Rune (NOX_LIMITATIONS.md)
 
-> **Hedef:** Rune kütüphanesinin tam ekran TUI (Terminal User Interface), etkileşimli klavye olay döngüsü (interactive event loop) ve maskeli parola girdisi (password echo suppression) yeteneklerini gerçek terminalde %100 yerel olarak çalıştırabilmesi için **Nox Runtime** (`noxrt.o`, `runtime/stdlib_shims/*.zig`) ve **Nox Standard Library** (`stdlib/nox/*`) katmanlarında yapılması gereken teknik eklemeler ve spesifikasyon.
+> **Durum Güncellemesi (`noxc 2.1.186` / Rune `v1.5.0`):**
+> Nox `v2.1.x` ile standart kütüphaneye **`nox.terminal`** ve **`nox.signal`** modülleri eklendi. Bu sayede aşağıda listelenen gereksinimlerin neredeyse tamamı (**raw mode, `poll_input`, `read_raw`, `get_size`, `is_tty`, `get_capabilities`, `write_raw`, `flush`, `set_echo`, `restore_state`, `SIGINT`/`SIGTERM`**) doğrudan karşılandı ve Rune `v1.5.0` ile entegre edildi.
+>
+> **Nox `v2.1.186`’da hâlâ devam eden platform sınırları:**
+> 1. **Windows Konsol Raw Mode & Echo:** `nox.terminal` Windows’ta `is_tty == False` döner; `enable_raw_mode()` ve `set_echo()` `TerminalError` fırlatır. Rune `is_tty(0)` ve `try/except TerminalError` ile güvenli sade moda düşer.
+> 2. **`SIGWINCH` Sinyali:** `nox.signal` içinde `sigwinch` bulunmaz. Rune `AppRunner.run_interactive()` döngüsünde `nox.terminal.get_size()` yoklaması (polling) ile boyut değişimini yakalar.
+
+---
+
+> **Tarihsel Hedef (v1.4.4 / v1.4.5, `noxc 2.0.27`):** Rune kütüphanesinin tam ekran TUI (Terminal User Interface), etkileşimli klavye olay döngüsü (interactive event loop) ve maskeli parola girdisi (password echo suppression) yeteneklerini gerçek terminalde %100 yerel olarak çalıştırabilmesi için **Nox Runtime** (`noxrt.o`, `runtime/stdlib_shims/*.zig`) ve **Nox Standard Library** (`stdlib/nox/*`) katmanlarında yapılması gereken teknik eklemeler ve spesifikasyon.
 
 ---
 

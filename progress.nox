@@ -2,8 +2,12 @@
 
 import nox.strings
 import nox.time
+import nox.terminal
 import core
-from core import Style, ConsoleOptions, cell_width
+from core import Style, Console, ConsoleOptions, cell_width, esc_code
+
+def _mono_ms() -> int:
+    return nox.time.monotonic_ns() // 1000000
 
 def pad_num(n: int, width: int = 2) -> str:
     s: str = str(n)
@@ -50,15 +54,16 @@ class Task:
         self.completed = 0
         self.finished = False
         self.unit = unit
-        now: int = nox.time.now_ms()
+        now: int = _mono_ms()
         self.start_time_ms = now
         self.last_update_ms = now
 
     def advance(self: Task, step: int = 1) -> None:
+
         self.completed = self.completed + step
         if self.completed < 0:
             self.completed = 0
-        self.last_update_ms = nox.time.now_ms()
+        self.last_update_ms = _mono_ms()
         if self.total > 0 and self.completed >= self.total:
             self.completed = self.total
             self.finished = True
@@ -66,11 +71,12 @@ class Task:
             self.finished = False
 
     def update(self: Task, completed: int) -> None:
+
         if completed < 0:
             self.completed = 0
         else:
             self.completed = completed
-        self.last_update_ms = nox.time.now_ms()
+        self.last_update_ms = _mono_ms()
         if self.total > 0 and self.completed >= self.total:
             self.completed = self.total
             self.finished = True
@@ -78,9 +84,10 @@ class Task:
             self.finished = False
 
     def percentage(self: Task) -> int:
+
         if self.total <= 0:
             return 0
-        pct: int = (self.completed * 100) // self.total
+        pct: int = self.completed * 100 // self.total
         if pct < 0:
             return 0
         if pct > 100:
@@ -88,21 +95,43 @@ class Task:
         return pct
 
     def is_finished(self: Task) -> bool:
+
         return self.finished
 
+    @property
+    def done(self: Task) -> bool:
+
+        return self.finished
+
+    @property
+    def ratio(self: Task) -> float:
+
+        if self.total <= 0:
+            return 0.0
+        r: float = float(self.completed) / float(self.total)
+        if r < 0.0:
+            return 0.0
+        if r > 1.0:
+            return 1.0
+        return r
+
     def elapsed_ms(self: Task) -> int:
-        return nox.time.now_ms() - self.start_time_ms
+
+        return _mono_ms() - self.start_time_ms
 
     def elapsed_seconds(self: Task) -> int:
+
         return self.elapsed_ms() // 1000
 
     def speed(self: Task) -> float:
+
         el_ms: int = self.elapsed_ms()
         if el_ms <= 0:
             return 0.0
-        return (float(self.completed) * 1000.0) / float(el_ms)
+        return float(self.completed) * 1000.0 / float(el_ms)
 
     def eta_seconds(self: Task) -> int:
+
         if self.finished or self.completed >= self.total:
             return 0
         rem: int = self.total - self.completed
@@ -114,6 +143,7 @@ class Task:
         return int(float(rem) / spd)
 
     def format_eta(self: Task) -> str:
+
         s: int = self.eta_seconds()
         if s < 0:
             return "--:--"
@@ -127,38 +157,30 @@ class ProgressBar:
     min_interval_ms: int
     last_render_ms: int
 
-    def __init__(
-        self: ProgressBar,
-        width: int = 20,
-        bar_char: str = "█",
-        empty_char: str = "─",
-        min_interval_ms: int = 50
-    ) -> None:
+    def __init__(self: ProgressBar, width: int = 20, bar_char: str = "█", empty_char: str = "─", min_interval_ms: int = 50) -> None:
         self.tasks = []
         self.width = width
         self.bar_char = bar_char
         self.empty_char = empty_char
         self.min_interval_ms = min_interval_ms
-        self.last_render_ms = 0
+        self.last_render_ms = _mono_ms() - min_interval_ms
 
     def add_task(self: ProgressBar, name: str, total: int = 100, unit: str = "items") -> Task:
+
         t: Task = Task(name, total, unit)
         self.tasks.append(t)
         return t
 
     def should_render(self: ProgressBar) -> bool:
-        now: int = nox.time.now_ms()
+
+        now: int = _mono_ms()
         if now - self.last_render_ms >= self.min_interval_ms:
             self.last_render_ms = now
             return True
         return False
 
-    def render_task(
-        self: ProgressBar,
-        task: Task,
-        options: ConsoleOptions,
-        show_eta: bool = True
-    ) -> str:
+    def render_task(self: ProgressBar, task: Task, options: ConsoleOptions, show_eta: bool = True) -> str:
+
         use_ascii: bool = not options.supports_unicode
         b_char: str = self.bar_char
         e_char: str = self.empty_char
@@ -173,7 +195,7 @@ class ProgressBar:
         pct: int = task.percentage()
         fill_count: int = 0
         if task.total > 0:
-            fill_count = (task.completed * bar_len) // task.total
+            fill_count = task.completed * bar_len // task.total
             if fill_count > bar_len:
                 fill_count = bar_len
 
@@ -196,6 +218,7 @@ class ProgressBar:
         return bar_visual + " " + stats + eta_part + " " + task.name
 
     def render_all(self: ProgressBar, options: ConsoleOptions, show_eta: bool = True) -> str:
+
         lines: list[str] = []
         i: int = 0
         while i < len(self.tasks):
@@ -216,6 +239,7 @@ class Spinner:
         self.index = 0
 
     def next_frame(self: Spinner, supports_unicode: bool = True) -> str:
+
         frame: str = ""
         if supports_unicode:
             frame = self.frames_unicode[self.index % len(self.frames_unicode)]
@@ -225,9 +249,106 @@ class Spinner:
         return frame
 
     def render(self: Spinner, options: ConsoleOptions) -> str:
+
         if not options.is_tty:
             return "[STATUS] " + self.message
         frame: str = self.next_frame(options.supports_unicode)
         if len(self.message) > 0:
             return frame + " " + self.message
         return frame
+
+class Live:
+    console: Console
+    transient: bool
+    active: bool
+    last_text: str
+    cursor_hidden: bool
+
+    def __init__(self: Live, console: Console | None = None, transient: bool = False) -> None:
+        if console is not None:
+            self.console = console
+        else:
+            self.console = Console()
+        self.transient = transient
+        self.active = False
+        self.last_text = ""
+        self.cursor_hidden = False
+
+    def start(self: Live) -> None:
+
+        if self.active:
+            return
+        self.active = True
+        if self.console.options.supports_ansi and self.console.options.is_tty and not self.console.options.capture:
+            self.console.write(esc_code() + "[?25l")
+            self.cursor_hidden = True
+
+    def update(self: Live, text: str) -> None:
+
+        self.last_text = text
+        if not self.console.options.supports_color:
+            text = core.strip_ansi(text)
+        if self.console.options.capture:
+            self.console.buffer = self.console.buffer + text + "\n"
+        elif self.console.options.supports_ansi and self.console.options.is_tty:
+            nox.terminal.write_raw("\r" + esc_code() + "[2K" + text)
+            nox.terminal.flush()
+        else:
+            self.console.print(text)
+
+    def stop(self: Live) -> None:
+
+        if not self.active:
+            return
+        self.active = False
+        if not self.console.options.capture and self.console.options.supports_ansi and self.console.options.is_tty:
+            if self.transient:
+                nox.terminal.write_raw("\r" + esc_code() + "[2K")
+            else:
+                nox.terminal.write_raw("\n")
+            if self.cursor_hidden:
+                nox.terminal.write_raw(esc_code() + "[?25h")
+                self.cursor_hidden = False
+            nox.terminal.flush()
+
+    def __enter__(self: Live) -> Live:
+
+        self.start()
+        return self
+
+    def __exit__(self: Live) -> None:
+
+        self.stop()
+
+    def __del__(self: Live) -> None:
+
+        self.stop()
+
+def track(items: list[str], description: str = "Working", console: Console | None = None, show_eta: bool = True) -> Iterator[str]:
+    con: Console = Console()
+    if console is not None:
+        con = console
+    total: int = len(items)
+    bar: ProgressBar = ProgressBar(20)
+    task: Task = bar.add_task(description, total)
+    for item in items:
+        yield item
+        task.advance(1)
+        if con.options.capture or con.options.is_tty:
+            if task.is_finished() or bar.should_render():
+                con.print(bar.render_task(task, con.options, show_eta))
+
+def track_range(total: int, description: str = "Working", console: Console | None = None, show_eta: bool = True) -> Iterator[int]:
+    con: Console = Console()
+    if console is not None:
+        con = console
+    bar: ProgressBar = ProgressBar(20)
+    task: Task = bar.add_task(description, total)
+    i: int = 0
+    while i < total:
+        yield i
+        task.advance(1)
+        if con.options.capture or con.options.is_tty:
+            if task.is_finished() or bar.should_render():
+                con.print(bar.render_task(task, con.options, show_eta))
+        i = i + 1

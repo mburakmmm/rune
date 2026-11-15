@@ -1,0 +1,126 @@
+# tests/unit/terminal_runtime_test.nox — Tests for v1.5.0 Nox 2.1 stdlib integration (nox.terminal, nox.unicode, UTF-8 byte decoder, TerminalSession).
+
+import nox.test
+import nox.bytes
+import nox.strings
+import core
+from core import Console, ConsoleOptions, detect_console_options, cell_width, normalize_text, upper_tr, lower_tr
+import events
+from events import KeyEvent, KeyDecoder, make_key_event
+import tui
+from tui import MockTerminalDriver
+import tui_runtime
+from tui_runtime import Frame, TuiApp, AppRunner, TerminalSession
+
+# 1. ConsoleOptions color_depth & supports_truecolor
+opts_plain: ConsoleOptions = ConsoleOptions(False, True, 80, 24, False, True)
+nox.test.assert_eq_int(opts_plain.color_depth, 0, "Plain ConsoleOptions defaults color_depth to 0")
+nox.test.assert_true(not opts_plain.supports_truecolor, "Plain ConsoleOptions disables truecolor")
+
+opts_16: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, False)
+nox.test.assert_eq_int(opts_16.color_depth, 16, "Colored ConsoleOptions defaults color_depth to 16")
+
+opts_tc: ConsoleOptions = ConsoleOptions(True, True, 80, 24, True, False, True, 16777216, True)
+nox.test.assert_eq_int(opts_tc.color_depth, 16777216, "Truecolor depth preserved")
+nox.test.assert_true(opts_tc.supports_truecolor, "supports_truecolor flag preserved")
+
+# 2. detect_console_options runtime safety
+detected: ConsoleOptions = detect_console_options()
+nox.test.assert_true(detected.width > 0, "Detected terminal width must be positive")
+nox.test.assert_true(detected.height > 0, "Detected terminal height must be positive")
+nox.test.assert_true(detected.color_depth >= 0, "Detected color_depth must be non-negative")
+
+# 3. Console.write capture behavior
+con: Console = Console(opts_plain)
+con.write("hello ")
+con.write("world")
+nox.test.assert_eq_str(con.get_captured(), "hello world", "Console.write appends inline without newline in capture mode")
+
+# 4. Unicode NFC & Turkish casing helpers
+decomposed_e: str = "e" + nox.strings.char_from_byte(204) + nox.strings.char_from_byte(129)  # e + U+0301
+nfc_e: str = normalize_text(decomposed_e, "NFC")
+nox.test.assert_eq_str(nfc_e, "é", "normalize_text composes decomposed accent to NFC")
+nox.test.assert_eq_int(cell_width(decomposed_e), 1, "Decomposed accent renders in 1 cell")
+nox.test.assert_eq_str(upper_tr("istanbul"), "İSTANBUL", "Turkish upper_tr converts i to İ")
+nox.test.assert_eq_str(lower_tr("İSTANBUL"), "istanbul", "Turkish lower_tr converts İ to i")
+
+# 5. Byte-safe UTF-8 chunk assembly in KeyDecoder
+dec: KeyDecoder = KeyDecoder()
+
+# Split 2-byte 'é' (0xC3, 0xA9)
+c2_a: str = nox.bytes.str_from_list([195])
+c2_b: str = nox.bytes.str_from_list([169])
+r2_a: list[KeyEvent] = dec.feed(c2_a)
+nox.test.assert_eq_int(len(r2_a), 0, "Partial 2-byte UTF-8 produces no event yet")
+nox.test.assert_eq_int(len(dec.utf8_pending), 1, "Leading UTF-8 byte held in utf8_pending")
+r2_b: list[KeyEvent] = dec.feed(c2_b)
+nox.test.assert_eq_int(len(r2_b), 1, "Completing byte emits 1 KeyEvent")
+nox.test.assert_eq_str(r2_b[0].key, "é", "Reassembled 2-byte UTF-8 matches 'é'")
+nox.test.assert_eq_int(len(dec.utf8_pending), 0, "utf8_pending cleared after completion")
+
+# Split 3-byte CJK '界' (0xE7, 0x95, 0x8C)
+c3_a: str = nox.bytes.str_from_list([231, 149])
+c3_b: str = nox.bytes.str_from_list([140])
+nox.test.assert_eq_int(len(dec.feed(c3_a)), 0, "Partial 3-byte CJK buffered")
+r3_b: list[KeyEvent] = dec.feed(c3_b)
+nox.test.assert_eq_int(len(r3_b), 1, "Completed CJK char emitted")
+nox.test.assert_eq_str(r3_b[0].key, "界", "Reassembled 3-byte UTF-8 matches '界'")
+
+# Split 4-byte emoji '🙂' (0xF0, 0x9F, 0x99, 0x82)
+c4_a: str = nox.bytes.str_from_list([240, 159])
+c4_b: str = nox.bytes.str_from_list([153, 130])
+nox.test.assert_eq_int(len(dec.feed(c4_a)), 0, "Partial 4-byte emoji buffered")
+r4_b: list[KeyEvent] = dec.feed(c4_b)
+nox.test.assert_eq_int(len(r4_b), 1, "Completed emoji emitted")
+nox.test.assert_eq_str(r4_b[0].key, "🙂", "Reassembled 4-byte UTF-8 matches emoji")
+
+# NUL byte (Ctrl+Space) and invalid stray continuation byte recovery
+nul_plus_a: str = nox.bytes.str_from_list([0, 128, 97])  # NUL, stray 0x80, 'a'
+r_rec: list[KeyEvent] = dec.feed(nul_plus_a)
+nox.test.assert_eq_int(len(r_rec), 2, "NUL and valid 'a' survive invalid continuation byte")
+nox.test.assert_eq_str(r_rec[0].to_str(), "ctrl+space", "NUL maps to ctrl+space")
+nox.test.assert_eq_str(r_rec[1].key, "a", "Decoder resynchronizes cleanly on ASCII 'a'")
+
+# 6. TerminalSession & AppRunner.run_interactive(max_frames) on MockTerminalDriver
+drv: MockTerminalDriver = MockTerminalDriver(30, 6, True, True)
+sess: TerminalSession = TerminalSession(drv, False, True, True)
+raw_active: bool = sess.open()
+nox.test.assert_true(not raw_active, "Mock driver keeps raw_enabled False")
+nox.test.assert_true(drv.is_alt_screen, "Session open enters alt screen")
+nox.test.assert_true(drv.is_cursor_hidden, "Session open hides cursor")
+sess.close()
+nox.test.assert_true(not drv.is_alt_screen, "Session close restores alt screen")
+nox.test.assert_true(not drv.is_cursor_hidden, "Session close restores cursor")
+
+class QuickTickApp(TuiApp):
+    ticks: int
+
+    def __init__(self: QuickTickApp) -> None:
+        self.running = True
+        self.title = "QuickTick"
+        self.ticks = 0
+
+    def init(self: QuickTickApp) -> None:
+
+        pass
+
+    def update(self: QuickTickApp, ev: events.Event) -> bool:
+
+        if ev.is_tick():
+            self.ticks = self.ticks + 1
+        return True
+
+    def view(self: QuickTickApp, frame: Frame) -> None:
+
+        frame.write_string(0, 0, "Ticks: " + str(self.ticks))
+
+app_rt: QuickTickApp = QuickTickApp()
+drv_rt: MockTerminalDriver = MockTerminalDriver(30, 5, True, True)
+runner_rt: AppRunner = AppRunner(app_rt, drv_rt, 10)
+runner_rt.run_interactive(3)
+nox.test.assert_eq_int(runner_rt.frame_count, 3, "run_interactive respects max_frames=3 cleanly")
+nox.test.assert_eq_int(app_rt.ticks, 2, "2 tick steps elapsed between 3 rendered frames")
+nox.test.assert_true(not drv_rt.is_alt_screen, "run_interactive always leaves alt screen on exit")
+nox.test.assert_true(not drv_rt.is_cursor_hidden, "run_interactive always shows cursor on exit")
+
+print("terminal_runtime_test passed")

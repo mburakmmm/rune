@@ -10,13 +10,7 @@ class Column:
     style: Style
     max_width: int
 
-    def __init__(
-        self: Column,
-        title: str,
-        align: str = "left",
-        style: Style | None = None,
-        max_width: int = 0
-    ) -> None:
+    def __init__(self: Column, title: str, align: str = "left", style: Style | None = None, max_width: int = 0) -> None:
         self.title = title
         self.align = align
         if style is not None:
@@ -39,13 +33,7 @@ class Table:
     header_style: Style
     padding: int
 
-    def __init__(
-        self: Table,
-        title: str = "",
-        border_style: str = "rounded",
-        header_style: Style | None = None,
-        padding: int = 1
-    ) -> None:
+    def __init__(self: Table, title: str = "", border_style: str = "rounded", header_style: Style | None = None, padding: int = 1) -> None:
         self.title = title
         self.columns = []
         self.rows = []
@@ -56,19 +44,23 @@ class Table:
             self.header_style = Style("", "", True, False, False, False, False)
         self.padding = padding
 
-    def add_column(
-        self: Table,
-        title: str,
-        align: str = "left",
-        style: Style | None = None,
-        max_width: int = 0
-    ) -> None:
+    def add_column(self: Table, title: str, align: str = "left", style: Style | None = None, max_width: int = 0) -> None:
+
         self.columns.append(Column(title, align, style, max_width))
 
     def add_row(self: Table, cells: list[str]) -> None:
+
         self.rows.append(Row(cells))
 
+    def add_cells(self: Table, *cells: str) -> None:
+
+        row_cells: list[str] = []
+        for c in cells:
+            row_cells.append(c)
+        self.rows.append(Row(row_cells))
+
     def _align_cell(self: Table, text: str, width: int, align: str) -> str:
+
         cw: int = cell_width(text)
         if cw >= width:
             return text
@@ -79,15 +71,18 @@ class Table:
             left_p: int = diff // 2
             right_p: int = diff - left_p
             return nox.strings.repeat(" ", left_p) + text + nox.strings.repeat(" ", right_p)
-        else: # left
+        else:
+            # left
             return text + nox.strings.repeat(" ", diff)
 
     def _get_cell_lines(self: Table, cell_str: str, col_def: Column) -> list[str]:
+
         if col_def.max_width > 0:
             return wrap_text(cell_str, col_def.max_width)
         return nox.strings.split(cell_str, "\n")
 
     def render(self: Table, options: ConsoleOptions) -> str:
+
         col_count: int = len(self.columns)
         if col_count == 0:
             return ""
@@ -177,7 +172,7 @@ class Table:
             top_parts: list[str] = []
             ci: int = 0
             while ci < col_count:
-                top_parts.append(nox.strings.repeat(h, col_widths[ci] + (pad * 2)))
+                top_parts.append(nox.strings.repeat(h, col_widths[ci] + pad * 2))
                 ci = ci + 1
             lines.append(tl + nox.strings.join(top_parts, tm) + tr)
 
@@ -198,7 +193,7 @@ class Table:
             sep_parts: list[str] = []
             ci3: int = 0
             while ci3 < col_count:
-                sep_parts.append(nox.strings.repeat(h, col_widths[ci3] + (pad * 2)))
+                sep_parts.append(nox.strings.repeat(h, col_widths[ci3] + pad * 2))
                 ci3 = ci3 + 1
             if self.border_style == "minimal":
                 lines.append(h + nox.strings.join(sep_parts, h) + h)
@@ -253,7 +248,7 @@ class Table:
             bot_parts: list[str] = []
             ci6: int = 0
             while ci6 < col_count:
-                bot_parts.append(nox.strings.repeat(h, col_widths[ci6] + (pad * 2)))
+                bot_parts.append(nox.strings.repeat(h, col_widths[ci6] + pad * 2))
                 ci6 = ci6 + 1
             lines.append(bl + nox.strings.join(bot_parts, bm) + br)
 

@@ -1,4 +1,18 @@
-# layout.nox — Bounding-box geometry and flex constraint layout solver for Rune TUI.
+# layout.nox — Bounding-box geometry, dataclasses, Direction/ConstraintKind enums, and flex layout solver for Rune TUI.
+
+@dataclass
+@derive("copy", "order")
+class Size:
+    width: int
+    height: int
+
+@dataclass
+@derive("copy")
+class Padding:
+    top: int
+    right: int
+    bottom: int
+    left: int
 
 class Rect:
     x: int
@@ -15,6 +29,26 @@ class Rect:
         self.y = y
         self.width = width
         self.height = height
+
+    @property
+    def right(self: Rect) -> int:
+
+        return self.x + self.width
+
+    @property
+    def bottom(self: Rect) -> int:
+
+        return self.y + self.height
+
+    @property
+    def bounds(self: Rect) -> Size:
+
+        return Size(self.width, self.height)
+
+    @property
+    def empty(self: Rect) -> bool:
+
+        return self.width <= 0 or self.height <= 0
 
     def area(self: Rect) -> int:
 
@@ -49,6 +83,16 @@ class Rect:
         if new_h < 0:
             new_h = 0
         return Rect(self.x + margin_x, self.y + margin_y, new_w, new_h)
+
+    def inner_padding(self: Rect, pad: Padding) -> Rect:
+
+        new_w: int = self.width - pad.left - pad.right
+        new_h: int = self.height - pad.top - pad.bottom
+        if new_w < 0:
+            new_w = 0
+        if new_h < 0:
+            new_h = 0
+        return Rect(self.x + pad.left, self.y + pad.top, new_w, new_h)
 
     def intersection(self: Rect, other: Rect) -> Rect:
 
@@ -92,69 +136,86 @@ class Rect:
             y2 = other.y + other.height
         return Rect(x1, y1, x2 - x1, y2 - y1)
 
-# Constraint Types
-CONSTRAINT_LENGTH: int = 1
-CONSTRAINT_PERCENTAGE: int = 2
-CONSTRAINT_RATIO: int = 3
-CONSTRAINT_MIN: int = 4
-CONSTRAINT_MAX: int = 5
+enum ConstraintKind:
+    Length(n: int)
+    Percentage(pct: int)
+    Ratio(num: int, den: int)
+    Min(n: int)
+    Max(n: int)
 
 class Constraint:
-    kind: int
-    val1: int
-    val2: int
+    spec: ConstraintKind
 
-    def __init__(self: Constraint, kind: int, val1: int = 0, val2: int = 0) -> None:
-        self.kind = kind
-        self.val1 = val1
-        self.val2 = val2
+    def __init__(self: Constraint, spec: ConstraintKind) -> None:
+        self.spec = spec
+
+    @property
+    def is_fixed(self: Constraint) -> bool:
+
+        match self.spec:
+            case ConstraintKind.Length(_):
+                return True
+            case ConstraintKind.Max(_):
+                return True
+            case ConstraintKind.Percentage(_):
+                return False
+            case ConstraintKind.Ratio(_, _):
+                return False
+            case ConstraintKind.Min(_):
+                return False
 
 def length_constraint(n: int) -> Constraint:
     if n < 0:
         n = 0
-    return Constraint(CONSTRAINT_LENGTH, n, 0)
+    return Constraint(ConstraintKind.Length(n))
 
 def percentage_constraint(p: int) -> Constraint:
     if p < 0:
         p = 0
     if p > 100:
         p = 100
-    return Constraint(CONSTRAINT_PERCENTAGE, p, 0)
+    return Constraint(ConstraintKind.Percentage(p))
 
 def ratio_constraint(num: int, den: int) -> Constraint:
     if den <= 0:
         den = 1
     if num < 0:
         num = 0
-    return Constraint(CONSTRAINT_RATIO, num, den)
+    return Constraint(ConstraintKind.Ratio(num, den))
 
 def min_constraint(n: int) -> Constraint:
     if n < 0:
         n = 0
-    return Constraint(CONSTRAINT_MIN, n, 0)
+    return Constraint(ConstraintKind.Min(n))
 
 def max_constraint(n: int) -> Constraint:
     if n < 0:
         n = 0
-    return Constraint(CONSTRAINT_MAX, n, 0)
+    return Constraint(ConstraintKind.Max(n))
 
-# Layout Directions
-DIRECTION_VERTICAL: int = 1
-DIRECTION_HORIZONTAL: int = 2
+enum Direction:
+    Vertical
+    Horizontal
+
+DIRECTION_VERTICAL: Direction = Direction.Vertical
+DIRECTION_HORIZONTAL: Direction = Direction.Horizontal
 
 class Layout:
-    direction: int
+    direction: Direction
     margin: int
     spacing: int
     constraints: list[Constraint]
 
-    def __init__(self: Layout, direction: int = 1, margin: int = 0, spacing: int = 0) -> None:
-        self.direction = direction
+    def __init__(self: Layout, direction: Direction | None = None, margin: int = 0, spacing: int = 0) -> None:
+        if direction is not None:
+            self.direction = direction
+        else:
+            self.direction = Direction.Vertical
         self.margin = margin
         self.spacing = spacing
         self.constraints = []
 
-    def set_direction(self: Layout, direction: int) -> Layout:
+    def set_direction(self: Layout, direction: Direction) -> Layout:
 
         self.direction = direction
         return self
@@ -178,6 +239,22 @@ class Layout:
         self.constraints.append(c)
         return self
 
+    def add_constraints(self: Layout, *items: Constraint) -> Layout:
+
+        for item in items:
+            self.constraints.append(item)
+        return self
+
+    def split_constraints(self: Layout, area: Rect, *items: Constraint) -> list[Rect]:
+
+        saved: list[Constraint] = self.constraints
+        self.constraints = []
+        for item in items:
+            self.constraints.append(item)
+        res: list[Rect] = self.split(area)
+        self.constraints = saved
+        return res
+
     def split(self: Layout, area: Rect) -> list[Rect]:
 
         n: int = len(self.constraints)
@@ -187,11 +264,13 @@ class Layout:
         if self.margin > 0:
             target_area = area.inner(self.margin)
 
-        total_size: int = target_area.height
-        if self.direction == DIRECTION_HORIZONTAL:
-            total_size = target_area.width
+        total_size: int = 0
+        match self.direction:
+            case Direction.Vertical:
+                total_size = target_area.height
+            case Direction.Horizontal:
+                total_size = target_area.width
 
-        # Account for spacing
         total_spacing: int = 0
         if n > 1 and self.spacing > 0:
             total_spacing = (n - 1) * self.spacing
@@ -199,53 +278,47 @@ class Layout:
         if available_size < 0:
             available_size = 0
 
-        # Step 1: calculate sizes
+        # Step 1: calculate base sizes using exhaustive match over ConstraintKind
         sizes: list[int] = []
         flexible_indices: list[int] = []
         allocated_total: int = 0
 
-        i: int = 0
-        while i < n:
-            c: Constraint = self.constraints[i]
+        for i, c in enumerate(self.constraints):
             sz: int = 0
-            if c.kind == CONSTRAINT_LENGTH:
-                sz = c.val1
-            elif c.kind == CONSTRAINT_PERCENTAGE:
-                sz = available_size * c.val1 // 100
-            elif c.kind == CONSTRAINT_RATIO:
-                sz = available_size * c.val1 // c.val2
-            elif c.kind == CONSTRAINT_MAX:
-                sz = c.val1
-                if sz > available_size:
-                    sz = available_size
-            elif c.kind == CONSTRAINT_MIN:
-                sz = c.val1
-                flexible_indices.append(i)
+            match c.spec:
+                case ConstraintKind.Length(val):
+                    sz = val
+                case ConstraintKind.Percentage(pct):
+                    sz = available_size * pct // 100
+                case ConstraintKind.Ratio(num, den):
+                    sz = available_size * num // den
+                case ConstraintKind.Max(cap):
+                    sz = cap
+                    if sz > available_size:
+                        sz = available_size
+                case ConstraintKind.Min(min_val):
+                    sz = min_val
+                    flexible_indices.append(i)
             sizes.append(sz)
             allocated_total = allocated_total + sz
-            i = i + 1
 
         # Step 2: distribute remaining space or clamp overallocation
         remaining: int = available_size - allocated_total
         if remaining > 0:
-            if len(flexible_indices) > 0:
-                extra_per_flex: int = remaining // len(flexible_indices)
-                rem_extra: int = remaining % len(flexible_indices)
-                f_idx: int = 0
-                while f_idx < len(flexible_indices):
-                    target_idx: int = flexible_indices[f_idx]
+            flex_len: int = len(flexible_indices)
+            if flex_len > 0:
+                extra_per_flex: int = remaining // flex_len
+                rem_extra: int = remaining % flex_len
+                for f_idx, target_idx in enumerate(flexible_indices):
                     bonus: int = extra_per_flex
                     if f_idx < rem_extra:
                         bonus = bonus + 1
                     sizes[target_idx] = sizes[target_idx] + bonus
-                    f_idx = f_idx + 1
             else:
-                # Find an index that is allowed to expand (not fixed LENGTH or MAX cap)
                 expand_idx: int = -1
                 chk: int = n - 1
                 while chk >= 0:
-                    ck: int = self.constraints[chk].kind
-                    if ck != CONSTRAINT_LENGTH and ck != CONSTRAINT_MAX:
+                    if not self.constraints[chk].is_fixed:
                         expand_idx = chk
                         break
                     chk = chk - 1
@@ -268,29 +341,28 @@ class Layout:
         res: list[Rect] = []
         cur_pos: int = 0
         limit_pos: int = 0
-        if self.direction == DIRECTION_VERTICAL:
-            cur_pos = target_area.y
-            limit_pos = target_area.y + target_area.height
-        else:
-            cur_pos = target_area.x
-            limit_pos = target_area.x + target_area.width
+        match self.direction:
+            case Direction.Vertical:
+                cur_pos = target_area.y
+                limit_pos = target_area.y + target_area.height
+            case Direction.Horizontal:
+                cur_pos = target_area.x
+                limit_pos = target_area.x + target_area.width
 
-        i = 0
-        while i < n:
-            chunk_sz: int = sizes[i]
+        for chunk_sz in sizes:
             if cur_pos + chunk_sz > limit_pos:
                 chunk_sz = limit_pos - cur_pos
             if chunk_sz < 0:
                 chunk_sz = 0
             child_rect: Rect = Rect()
-            if self.direction == DIRECTION_VERTICAL:
-                child_rect = Rect(target_area.x, cur_pos, target_area.width, chunk_sz)
-            else:
-                child_rect = Rect(cur_pos, target_area.y, chunk_sz, target_area.height)
+            match self.direction:
+                case Direction.Vertical:
+                    child_rect = Rect(target_area.x, cur_pos, target_area.width, chunk_sz)
+                case Direction.Horizontal:
+                    child_rect = Rect(cur_pos, target_area.y, chunk_sz, target_area.height)
             res.append(child_rect)
             cur_pos = cur_pos + chunk_sz + self.spacing
             if cur_pos > limit_pos:
                 cur_pos = limit_pos
-            i = i + 1
 
         return res

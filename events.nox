@@ -1,10 +1,16 @@
 # events.nox — ANSI key sequence decoder, terminal events, and event structures for Rune TUI.
 
 import nox.strings
+import nox.bytes
 
-EVENT_KEY: int = 1
-EVENT_TICK: int = 2
-EVENT_RESIZE: int = 3
+enum EventKind:
+    Key
+    Tick
+    Resize
+
+EVENT_KEY: EventKind = EventKind.Key
+EVENT_TICK: EventKind = EventKind.Tick
+EVENT_RESIZE: EventKind = EventKind.Resize
 
 class KeyEvent:
     key: str
@@ -19,6 +25,7 @@ class KeyEvent:
         self.shift = shift
 
     def to_str(self: KeyEvent) -> str:
+
         res: str = ""
         if self.ctrl:
             res = res + "ctrl+"
@@ -30,6 +37,7 @@ class KeyEvent:
         return res
 
     def matches(self: KeyEvent, pattern: str) -> bool:
+
         pat: str = nox.strings.lower(pattern)
         if self.to_str() == pat:
             return True
@@ -52,7 +60,7 @@ class ResizeEvent:
         self.height = height
 
 class Event:
-    type: int
+    type: EventKind
     key: str
     ctrl: bool
     alt: bool
@@ -61,17 +69,7 @@ class Event:
     width: int
     height: int
 
-    def __init__(
-        self: Event,
-        type: int,
-        key: str = "",
-        ctrl: bool = False,
-        alt: bool = False,
-        shift: bool = False,
-        delta_ms: int = 0,
-        width: int = 0,
-        height: int = 0
-    ) -> None:
+    def __init__(self: Event, type: EventKind, key: str = "", ctrl: bool = False, alt: bool = False, shift: bool = False, delta_ms: int = 0, width: int = 0, height: int = 0) -> None:
         self.type = type
         self.key = key
         self.ctrl = ctrl
@@ -82,53 +80,168 @@ class Event:
         self.height = height
 
     def to_key_event(self: Event) -> KeyEvent:
+
         return KeyEvent(self.key, self.ctrl, self.alt, self.shift)
 
     def is_key(self: Event, expected: str = "") -> bool:
-        if self.type != EVENT_KEY:
-            return False
-        if len(expected) == 0:
-            return True
-        return self.to_key_event().matches(expected)
+
+        match self.type:
+            case EventKind.Key:
+                if len(expected) == 0:
+                    return True
+                return self.to_key_event().matches(expected)
+            case EventKind.Tick:
+                return False
+            case EventKind.Resize:
+                return False
 
     def is_ctrl(self: Event, expected: str = "") -> bool:
-        if self.type != EVENT_KEY or not self.ctrl:
-            return False
-        if len(expected) == 0:
-            return True
-        return self.key == expected
+
+        match self.type:
+            case EventKind.Key:
+                if not self.ctrl:
+                    return False
+                if len(expected) == 0:
+                    return True
+                return self.key == expected
+            case EventKind.Tick:
+                return False
+            case EventKind.Resize:
+                return False
 
     def is_tick(self: Event) -> bool:
-        return self.type == EVENT_TICK
+
+        return self.type == EventKind.Tick
 
     def is_resize(self: Event) -> bool:
-        return self.type == EVENT_RESIZE
+
+        return self.type == EventKind.Resize
 
     def key_str(self: Event) -> str:
-        if self.type != EVENT_KEY:
-            return ""
-        return self.to_key_event().to_str()
+
+        match self.type:
+            case EventKind.Key:
+                return self.to_key_event().to_str()
+            case EventKind.Tick:
+                return ""
+            case EventKind.Resize:
+                return ""
 
 def make_key_event(key: str, ctrl: bool = False, alt: bool = False, shift: bool = False) -> Event:
-    return Event(EVENT_KEY, key, ctrl, alt, shift, 0, 0, 0)
+    return Event(EventKind.Key, key, ctrl, alt, shift, 0, 0, 0)
 
 def make_tick_event(delta_ms: int) -> Event:
-    return Event(EVENT_TICK, "", False, False, False, delta_ms, 0, 0)
+    return Event(EventKind.Tick, "", False, False, False, delta_ms, 0, 0)
 
 def make_resize_event(width: int, height: int) -> Event:
-    return Event(EVENT_RESIZE, "", False, False, False, 0, width, height)
+    return Event(EventKind.Resize, "", False, False, False, 0, width, height)
+
+def _utf8_seq_len(lead: int) -> int:
+    if lead < 128:
+        return 1
+    if lead >= 194 and lead <= 223:
+        return 2
+    if lead >= 224 and lead <= 239:
+        return 3
+    if lead >= 240 and lead <= 244:
+        return 4
+    return -1
 
 class KeyDecoder:
     buffer: str
+    utf8_pending: list[int]
 
     def __init__(self: KeyDecoder) -> None:
         self.buffer = ""
+        self.utf8_pending = []
 
     def clear(self: KeyDecoder) -> None:
+
         self.buffer = ""
+        self.utf8_pending = []
+
+    def _consume_utf8_bytes(self: KeyDecoder, chunk: str) -> str:
+
+        c_bytes: int = nox.strings.byte_len(chunk)
+        if c_bytes == 0 and len(self.utf8_pending) == 0:
+            return ""
+
+        all_bytes: list[int] = []
+        p_idx: int = 0
+        while p_idx < len(self.utf8_pending):
+            all_bytes.append(self.utf8_pending[p_idx])
+            p_idx = p_idx + 1
+        self.utf8_pending = []
+
+        idx: int = 0
+        while idx < c_bytes:
+            all_bytes.append(nox.strings.byte_at(chunk, idx))
+            idx = idx + 1
+
+        total: int = len(all_bytes)
+        if total == 0:
+            return ""
+
+        ready: list[int] = []
+        pos: int = 0
+        while pos < total:
+            b: int = all_bytes[pos]
+            if b < 128:
+                ready.append(b)
+                pos = pos + 1
+                continue
+
+            need: int = _utf8_seq_len(b)
+            if need < 0:
+                # Skip stray continuation or invalid UTF-8 lead byte
+                pos = pos + 1
+                continue
+
+            if pos + need > total:
+                # Save incomplete trailing multi-byte sequence for next read_raw() chunk
+                rem: int = pos
+                while rem < total:
+                    self.utf8_pending.append(all_bytes[rem])
+                    rem = rem + 1
+                break
+
+            valid: bool = True
+            k: int = 1
+            while k < need:
+                cb: int = all_bytes[pos + k]
+                if cb < 128 or cb > 191:
+                    valid = False
+                    break
+                k = k + 1
+
+            # Reject overlong E0/F0/surrogate ED encodings safely
+            if valid and need == 3:
+                b1: int = all_bytes[pos + 1]
+                if b == 224 and b1 < 160 or b == 237 and b1 >= 160:
+                    valid = False
+            elif valid and need == 4:
+                b1_4: int = all_bytes[pos + 1]
+                if b == 240 and b1_4 < 144 or b == 244 and b1_4 > 143:
+                    valid = False
+
+            if not valid:
+                pos = pos + 1
+                continue
+
+            k2: int = 0
+            while k2 < need:
+                ready.append(all_bytes[pos + k2])
+                k2 = k2 + 1
+            pos = pos + need
+
+        if len(ready) == 0:
+            return ""
+        return nox.bytes.str_from_list(ready)
 
     def feed(self: KeyDecoder, chunk: str) -> list[KeyEvent]:
-        raw: str = self.buffer + chunk
+
+        valid_chunk: str = self._consume_utf8_bytes(chunk)
+        raw: str = self.buffer + valid_chunk
         self.buffer = ""
         decoded: list[KeyEvent] = []
         n: int = len(raw)
@@ -236,9 +349,9 @@ class KeyDecoder:
                             continue
                         self.buffer = raw[i:]
                         break
-
-                # SS3: \x1bO
                 elif next_ch == "O":
+
+                    # SS3: \x1bO
                     if i + 2 < n:
                         fn: str = raw[i + 2]
                         if fn == "P":
@@ -255,14 +368,16 @@ class KeyDecoder:
                         # Incomplete SS3 sequence, retain in buffer
                         self.buffer = raw[i:]
                         break
-
-                # Alt + character: \x1b<char>
                 else:
+
+                    # Alt + character: \x1b<char>
                     decoded.append(KeyEvent(next_ch, False, True, False))
                     i = i + 2
                     continue
+            elif b == 0:
 
-            # 2. Control Characters
+                # 2. Control Characters
+                decoded.append(KeyEvent("space", True, False, False))
             elif b == 9:
                 decoded.append(KeyEvent("tab"))
             elif b == 10 or b == 13:
@@ -272,9 +387,9 @@ class KeyDecoder:
             elif b >= 1 and b <= 26:
                 ctrl_key: str = chr(96 + b)
                 decoded.append(KeyEvent(ctrl_key, True, False, False))
-
-            # 3. Standard Characters
             else:
+
+                # 3. Standard Characters
                 decoded.append(KeyEvent(ch, False, False, False))
 
             i = i + 1
@@ -282,6 +397,7 @@ class KeyDecoder:
         return decoded
 
     def decode(self: KeyDecoder, raw: str) -> list[KeyEvent]:
+
         res: list[KeyEvent] = self.feed(raw)
         if len(self.buffer) > 0:
             flushed: list[KeyEvent] = self.flush()
@@ -292,6 +408,8 @@ class KeyDecoder:
         return res
 
     def flush(self: KeyDecoder) -> list[KeyEvent]:
+
+        self.utf8_pending = []
         res: list[KeyEvent] = []
         if len(self.buffer) > 0:
             b: str = self.buffer

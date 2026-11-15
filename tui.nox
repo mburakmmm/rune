@@ -1,15 +1,16 @@
 # tui.nox — Terminal User Interface driver, virtual screen buffer, and diff-based painter.
 
 import nox.strings
+import nox.terminal
 from core import Style, ConsoleOptions, detect_console_options, esc_code, reset_code, char_width, strip_ansi
 import layout
-from layout import Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, CONSTRAINT_LENGTH, CONSTRAINT_PERCENTAGE, CONSTRAINT_RATIO, CONSTRAINT_MIN, CONSTRAINT_MAX
+from layout import Size, Padding, Rect, Constraint, ConstraintKind, Direction, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL
 import widgets
 from widgets import Block, Paragraph, Gauge, Tabs, ListItem, ListWidget, TableWidget, HelpBar
 import events
-from events import KeyEvent, TickEvent, ResizeEvent, Event, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
+from events import EventKind, KeyEvent, TickEvent, ResizeEvent, Event, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
 import tui_runtime
-from tui_runtime import Frame, TuiApp, AppRunner
+from tui_runtime import Frame, TuiApp, AppRunner, TerminalSession
 
 class Cell:
     char: str
@@ -373,6 +374,14 @@ class ScreenBuffer:
             y = y + 1
         return nox.strings.join(lines, "\n")
 
+    def iter_cells(self: ScreenBuffer) -> Iterator[Cell]:
+
+        i: int = 0
+        total: int = len(self.cells)
+        while i < total:
+            yield self.cells[i]
+            i = i + 1
+
 class TerminalDriver:
     options: ConsoleOptions
     is_alt_screen: bool
@@ -404,16 +413,13 @@ class TerminalDriver:
 
     def write_raw(self: TerminalDriver, s: str) -> None:
 
-        if len(s) == 0:
+        if nox.strings.byte_len(s) == 0:
             return
         if self.capture_mode:
             self.captured_output = self.captured_output + s
         else:
-            # Park cursor at row 1, col 1 so print()'s trailing newline never scrolls the bottom line offscreen
-            if self.options.supports_ansi:
-                print(s + esc_code() + "[H")
-            else:
-                print(s)
+            nox.terminal.write_raw(s)
+            nox.terminal.flush()
 
     def enter_alt_screen(self: TerminalDriver) -> None:
 

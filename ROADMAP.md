@@ -33,6 +33,8 @@
 | **Phase 10.3: Precision Clipping & Delays** | `v1.4.3` | Left-clip offsets, wide Unicode boundary integrity, clip stack, escape delay | **Completed** | `tui_widgets_test`, `tui_app_test`, `tui_layout_test` (22 suites) |
 | **Phase 10.4: Boundary Preservation** | `v1.4.4` | External wide char atomization boundary protection, scoped clips, single tick loop | **Completed** | `tui_widgets_test`, `tui_app_test` (22 suites) |
 | **Phase 10.5: Atomic Cell Transactions** | `v1.4.5` | Atomic cell pre-flight verification, invariant validation, `NOX_LIMITATIONS.md` expansion | **Completed** | `tui_widgets_test` (22 suites) |
+| **Phase 11: Real Terminal & Stdlib Integration (Path A)** | `v1.5.0` | `nox.terminal`, `nox.signal`, monotonic timing, NFC Unicode, live TUI I/O, `prompt_password`, `nox.property` fuzzing | **Completed** | `terminal_runtime_test`, `property_fuzz_test` (24 suites) |
+| **Phase 12: Nox 2.1 Language & Perf Modernization (Path B)** | `v2.0.0` | `enum`/`match`, `@dataclass`, `@property`, `*args`, `with`/`__del__`, `yield`, `nox.regex`, slice/zero-alloc hot paths | **Completed** | `modern_v2_test`, full `2.0.0` suite (25 suites) |
 
 ---
 
@@ -428,6 +430,58 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
   - Added `ScreenBuffer.validate_invariants()` checking that every `width == 2` cell is followed by a `width == 0` cell, and every `width == 0` cell is preceded by a `width == 2` cell.
 - [x] **Expanded `NOX_LIMITATIONS.md`**:
   - Documented `read_raw -> bytes`, `TerminalSession`, `restore_state()`, and `get_capabilities()` for the Nox compiler runtime roadmap.
+
+---
+
+### ⚡ v1.5.0 — Path A: Real Terminal Runtime & Nox 2.1 Stdlib Integration (Completed)
+**Goal:** Close `NOX_LIMITATIONS.md` using Nox `v2.1.x` stdlib (`nox.terminal`, `nox.signal`, `nox.time`, `nox.unicode`, `nox.property`) while preserving full `1.x` compatibility and graceful Windows / non-TTY / CI fallbacks.
+
+- [x] **Real Capabilities, Size & Inline `Console.write()` (`core.nox`)**:
+  - Add `color_depth` (`0` / `16` / `256` / `16777216`) and `supports_truecolor` awareness backed by `nox.terminal.get_capabilities()`, `nox.terminal.is_tty(1)`, and `nox.terminal.get_size()` while respecting `NO_COLOR` > `CLICOLOR_FORCE` > `TERM=dumb` > `CI` > Windows checks.
+  - Replace the non-capture `Console.write()` buffer placeholder with real unbuffered `nox.terminal.write_raw()` + `nox.terminal.flush()`.
+- [x] **Unicode NFC Normalization & Turkish Casing (`core.nox`)**:
+  - Integrate `nox.unicode.normalize(s, "NFC")` for display-width measurement (`cell_width`) and text rendering so decomposed combining forms align accurately.
+  - Expose Turkish-aware `upper_tr` / `lower_tr` helpers via `core.nox` / `rune.nox`.
+- [x] **Real Echo-Suppressed Password Prompts (`prompt.nox`)**:
+  - Implement real `prompt_password()` via `nox.terminal.is_tty(0)` + `nox.terminal.set_echo(False)` wrapped in strict `try ... finally: nox.terminal.set_echo(True)` (plus `restore_state()` safety).
+  - Raise explicit `PromptError` / `NonInteractiveError` when stdin is non-TTY or Windows raises `TerminalError` (never fall back to insecure echoed password input).
+- [x] **Monotonic Timing & Fiber-Cooperative Progress (`progress.nox`)**:
+  - Migrate `Task` and `ProgressBar` timing from wall clock `nox.time.now_ms()` to `nox.time.monotonic_ns()` / `Instant` so NTP/clock jumps never corrupt elapsed time, speed, or ETA.
+- [x] **Byte-Safe UTF-8 & Raw Terminal Driver (`events.nox`, `tui.nox`)**:
+  - Upgrade `KeyDecoder` to buffer split multi-byte UTF-8 chunks coming from `nox.terminal.read_raw()` using `nox.strings.byte_len`, `nox.strings.byte_at`, and `nox.bytes.str_from_list`.
+  - Migrate `TerminalDriver.write_raw()` / `flush()` from the `print(... + "[H")` workaround to `nox.terminal.write_raw()` + `nox.terminal.flush()`.
+  - Add `TerminalSession` RAII helper wrapping ref-counted `nox.terminal.enable_raw_mode()` / `disable_raw_mode()` / `restore_state()` with safe non-TTY / Windows `TerminalError` handling.
+- [x] **Live Interactive Event Loop (`tui_runtime.nox`)**:
+  - Wire `AppRunner.run_interactive()` to `TerminalSession` (guarded for non-TTY / Windows `TerminalError`), cooperative `nox.terminal.poll_input()` + `read_raw()`, `KeyDecoder` event batching, `nox.terminal.get_size()` live resize polling (`ResizeEvent`), monotonic tick accounting, and `nox.signal` (`sigint`, `sigterm`) graceful shutdown.
+  - Guarantee terminal restoration (`driver.restore()`, `session.close()`, `nox.terminal.restore_state()`) in `finally`.
+- [x] **Property-Based Fuzz Testing (`nox.property`)**:
+  - Add `tests/unit/property_fuzz_test.nox` testing `ScreenBuffer.validate_invariants()`, fragmented UTF-8/ESC streams in `KeyDecoder`, `sanitize_ansi()` injection resistance, `wrap_text()`, and `CliApp.parse()`.
+- [x] **Packaging, Metadata & CI (`nox.json`, `.github/workflows/ci.yml`, Docs)**:
+  - Add `"source": "nox"` to `nox.json` and bump version to `1.5.0`.
+  - Update `.github/workflows/ci.yml` from stale `v2.0.27` to `v2.1.186` and update `README.md`, `CHANGELOG.md`, `docs/api.md`, `docs/capabilities.md`, and `NOX_LIMITATIONS.md`.
+
+---
+
+### 🚀 v2.0.0 — Path B: Nox 2.1 Language, Performance & API Modernization (Completed)
+**Goal:** Modernize Rune's API and internal implementation with Nox `v2.1.x` compiler features (`enum`/`match`, `@dataclass`, `@property`, `*args`, `with`/`__del__`, `yield`, `nox.regex`, zero-allocation slices/iterators), keeping strict module boundaries and providing clear migration guidance.
+
+- [x] **Compiler Feature Verification Gate**:
+  - Verified `noxc 2.1.186` support and edge cases for `enum`, `match/case` exhaustiveness, `@dataclass`, `@derive`, `@property`, `*args`, `__enter__`/`__exit__`, `__del__`, `yield`, and `nox.regex` via scratch compilation proofs before refactoring modules.
+- [x] **Strongly-Typed `enum` + Exhaustive `match/case` Modernization**:
+  - Introduced `ArgType` (`arguments.nox`, `options.nox`, `cli.nox`), `EventKind` (`events.nox`), and `ConstraintKind` & `Direction` (`layout.nox`) enums with exhaustive `match` dispatch while retaining compatibility aliases where helpful.
+- [x] **`@dataclass` / `@derive` & `@property` Ergonomics**:
+  - Added `@dataclass @derive("copy", "order")` `Size` and `@dataclass @derive("copy")` `Padding` (`layout.nox`) and `TreeItem` (`tree.nox`).
+  - Exposed `@property` accessors (`ConsoleOptions.is_plain`, `Task.done`, `Task.ratio`, `Rect.right`/`bottom`/`bounds`/`empty`, `Constraint.is_fixed`, `Frame.bounds`/`is_clipped`, `TerminalSession.is_open`/`is_raw`).
+- [x] **Variadic `*args`, Context Managers (`with`/`__del__`) & Generators (`yield`)**:
+  - Added variadic helpers `Console.print_items(*items)`, `Table.add_cells(*cells)`, `Layout.add_constraints(*items)`, and `Layout.split_constraints(area, *items)`.
+  - Implemented `__enter__`/`__exit__` + `__del__` cleanup on `TerminalSession` and `Live` for idiomatic `with ...:` blocks.
+  - Added lazy `yield` generators `track()`, `track_range()`, `Tree.walk()`, and `ScreenBuffer.iter_cells()`.
+- [x] **Zero-Allocation Hot Paths & `nox.regex` Engine**:
+  - Refactored `core.nox` (`strip_ansi`, `sanitize_ansi`), `syntax.nox` (`highlight_line`), and `markdown.nox` (`format_inline_markdown`, `nox.strings.repeat`) to slice-based scanning and fast plain-text bypasses.
+  - Integrated pure-Zig `nox.regex` into `markdown.nox` ordered-list detection (`^([0-9]{1,4}\. )(.*)$`).
+- [x] **2.0 Release, Benchmarks, Fuzz & Migration Docs**:
+  - Added `tests/unit/modern_v2_test.nox` and verified all 25 test suites + all 11 examples + `benchmarks/run_benchmarks.nox`.
+  - Updated `nox.json` to `2.0.0`, updated `rune.nox` and `rune/*.nox` re-exports, completed `docs/migration.md` (`1.x -> 2.0.0`), `docs/api.md`, `README.md`, `CHANGELOG.md`, and ran `noxc fmt`, `noxc check`, and full `noxc test`.
 
 ---
 

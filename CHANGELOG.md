@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-11-15
+
+### Added & Modernized (Path B: Nox `2.1` Language, Performance & API Release)
+- **Strongly-Typed Enums & Exhaustive `match` (`arguments.nox`, `options.nox`, `cli.nox`, `events.nox`, `layout.nox`)**:
+  - Added `ArgType` (`Str`, `Int`, `Float`, `Bool`) + `arg_type_name()`, `EventKind` (`Key`, `Tick`, `Resize`), `Direction` (`Vertical`, `Horizontal`), and `ConstraintKind` algebraic enum (`Length`, `Percentage`, `Ratio`, `Min`, `Max`) with compile-time exhaustive `match` dispatch.
+  - Replaced legacy integer constraint tags (`CONSTRAINT_*`) with `ConstraintKind` (see [docs/migration.md](docs/migration.md)); preserved `TYPE_*`, `EVENT_*`, and `DIRECTION_*` constant aliases for smooth upgrades.
+- **`@dataclass` / `@derive` Value Types & `@property` Accessors**:
+  - Added `@dataclass @derive("copy", "order") class Size`, `@dataclass @derive("copy") class Padding` + `Rect.inner_padding(Padding)`, and `@dataclass @derive("copy") class TreeItem`.
+  - Added `@property` accessors: `ConsoleOptions.is_plain`, `Task.done`, `Task.ratio`, `Rect.right`, `Rect.bottom`, `Rect.bounds`, `Rect.empty`, `Constraint.is_fixed`, `Frame.bounds`, `Frame.is_clipped`, `TerminalSession.is_open`, `TerminalSession.is_raw`.
+- **RAII Context Managers (`with` / `__del__`), Variadic `*args` & `yield` Generators**:
+  - Added `__enter__`, `__exit__`, and `__del__` cleanup to `TerminalSession` (`tui_runtime.nox`) and the new `Live` display controller (`progress.nox`).
+  - Added variadic `*args` helpers `Console.print_items(*items)`, `Table.add_cells(*cells)`, `Layout.add_constraints(*items)`, and `Layout.split_constraints(area, *items)`.
+  - Added lazy `yield` iterators `track()`, `track_range()`, `Tree.walk()`, and `ScreenBuffer.iter_cells()`.
+- **Slice/Zero-Allocation Hot Paths & Pure-Zig `nox.regex`**:
+  - Optimized `core.nox` (`strip_ansi`, `sanitize_ansi`), `syntax.nox` (`highlight_line`), and `markdown.nox` (`format_inline_markdown`, `nox.strings.repeat`) to slice-based scanning and plain-text fast paths.
+  - Replaced manual ordered-list index scanning in `markdown.nox` with `nox.regex.match("^([0-9]{1,4}\\. )(.*)$", trimmed)`.
+- **Tests, Packaging & Documentation**:
+  - Added `tests/unit/modern_v2_test.nox` (25 total test suites) and bumped `nox.json` & `main.nox` to `2.0.0`.
+  - Updated `docs/migration.md`, `docs/api.md`, `README.md`, and `ROADMAP.md` for `2.0.0`.
+
+---
+
+## [1.5.0] - 2026-11-15
+
+### Added & Integrated (Path A: Nox `v2.1.186` Stdlib & Live Terminal Runtime)
+- **Live Terminal Capabilities & Unbuffered I/O (`core.nox`, `tui.nox`)**:
+  - `detect_console_options()` now queries `nox.terminal.get_capabilities()`, `nox.terminal.get_size()`, and `nox.terminal.is_tty(1)` with full `color_depth` (`0`/`16`/`256`/`16777216`) and `supports_truecolor` support while honoring `NO_COLOR`, `CLICOLOR_FORCE`, `TERM=dumb`, `CI`, and Windows fallbacks.
+  - `Console.write()` and `TerminalDriver.write_raw()` now write directly without trailing newlines using `nox.terminal.write_raw()` and `nox.terminal.flush()`.
+- **Live Interactive TUI Session & Signal Safety (`tui_runtime.nox`, `events.nox`)**:
+  - Added `TerminalSession` wrapping ref-counted `nox.terminal.enable_raw_mode()` / `disable_raw_mode()` and emergency `restore_state()`, safely guarded for non-TTY and Windows `TerminalError`.
+  - Upgraded `AppRunner.run_interactive()` with cooperative `nox.terminal.poll_input()`, non-blocking `read_raw(256)` draining, `nox.terminal.get_size()` live resize polling (`ResizeEvent`), and `nox.signal` (`sigint`, `sigterm`) clean shutdown.
+  - Upgraded `KeyDecoder` with UTF-8 byte-level buffering (`nox.strings.byte_len`, `byte_at`, `nox.bytes.str_from_list`) so partial multi-byte UTF-8 sequences split across `read_raw()` chunks reassemble cleanly without corruption, plus `Ctrl+Space` (`\x00`) handling.
+- **Echo-Suppressed Passwords & Monotonic Progress (`prompt.nox`, `progress.nox`)**:
+  - Implemented real TTY echo suppression in `prompt_password()` using `nox.terminal.set_echo(False)` inside `try ... finally`, while raising `PromptError` / `NonInteractiveError` safely on non-TTY or unsupported Windows consoles.
+  - Migrated `Task` and `ProgressBar` timing to `nox.time.monotonic_ns()`, eliminating NTP wall-clock skew in ETA and rate throttling.
+- **Unicode NFC & Turkish Casing (`core.nox`)**:
+  - Integrated `nox.unicode.normalize(..., "NFC")` into `cell_width` and exposed `normalize_text`, `upper_tr`, and `lower_tr`.
+- **Property-Based Fuzzing & Packaging (`nox.property`, `nox.json`)**:
+  - Added `tests/unit/terminal_runtime_test.nox` and `tests/unit/property_fuzz_test.nox` (`ScreenBuffer` invariants, fragmented UTF-8/CSI `KeyDecoder`, `sanitize_ansi`, `wrap_text`, `CliApp.parse`).
+  - Added `"source": "nox"` to `nox.json` and updated CI `NOX_VERSION` to `v2.1.186`.
+
+---
+
 ## [1.4.5] - 2026-10-27
 
 ### Fixed & Hardened (GPT 5.6 Audit Hardening for Atomic Cell Transactions & Invariant Validation)

@@ -1,7 +1,7 @@
 # rune.nox — Top-level unified facade for Rune (Rich + Click + Typer for Nox).
 
 import core
-from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, esc_code, reset_code, color_256, bg_256, color_rgb, bg_rgb, truncate, wrap_text
+from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, normalize_text, upper_tr, lower_tr, esc_code, reset_code, color_256, bg_256, color_rgb, bg_rgb, truncate, wrap_text
 
 import text
 from text import Text, Span
@@ -28,13 +28,13 @@ import render
 from render import Rule as RenderRule, Panel as RenderPanel, Table as RenderTable, Tree as RenderTree, Syntax as RenderSyntax, Markdown as RenderMarkdown
 
 import progress
-from progress import Task, ProgressBar, Spinner, format_duration, format_bytes, pad_num
+from progress import Task, ProgressBar, Spinner, Live, track, track_range, format_duration, format_bytes, pad_num
 
 import prompt
 from prompt import prompt_text, prompt_int, confirm, select_choice, select_multiple, prompt_password, PromptError, NonInteractiveError
 
 import arguments
-from arguments import Argument, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+from arguments import Argument, ArgType, arg_type_name, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
 
 import options
 from options import Option
@@ -49,4 +49,4 @@ import completion
 from completion import generate_completion, generate_bash_completion, generate_zsh_completion, generate_fish_completion
 
 import tui
-from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver, Rect, Constraint, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, Block, Paragraph, Gauge, Tabs, ListItem, ListWidget, TableWidget, HelpBar, Frame, TuiApp, AppRunner, Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
+from tui import Cell, ScreenBuffer, TerminalDriver, MockTerminalDriver, TerminalSession, Size, Padding, Rect, Constraint, ConstraintKind, Direction, Layout, length_constraint, percentage_constraint, ratio_constraint, min_constraint, max_constraint, DIRECTION_VERTICAL, DIRECTION_HORIZONTAL, Block, Paragraph, Gauge, Tabs, ListItem, ListWidget, TableWidget, HelpBar, Frame, TuiApp, AppRunner, EventKind, Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event

@@ -1,6 +1,10 @@
 # tui_runtime.nox — TUI Application runtime, Elm/Bubbletea-style update/view architecture, and frame loop.
 
 import nox.time
+import nox.strings
+import nox.terminal
+from nox.terminal import TerminalError, TerminalSize
+import nox.signal
 import core
 from core import Style
 import layout
@@ -8,7 +12,7 @@ from layout import Rect
 import tui
 from tui import ScreenBuffer, TerminalDriver
 import events
-from events import Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
+from events import EventKind, Event, KeyEvent, TickEvent, ResizeEvent, EVENT_KEY, EVENT_TICK, EVENT_RESIZE, KeyDecoder, make_key_event, make_tick_event, make_resize_event
 
 class Frame:
     buffer: ScreenBuffer
@@ -20,32 +24,51 @@ class Frame:
         self.width = buffer.width
         self.height = buffer.height
 
+    @property
+    def bounds(self: Frame) -> Rect:
+
+        return Rect(0, 0, self.width, self.height)
+
+    @property
+    def is_clipped(self: Frame) -> bool:
+
+        return self.buffer.get_clip() != None
+
     def size(self: Frame) -> Rect:
+
         return Rect(0, 0, self.width, self.height)
 
     def push_clip(self: Frame, rect: Rect) -> None:
+
         self.buffer.push_clip(rect)
 
     def pop_clip(self: Frame) -> None:
+
         self.buffer.pop_clip()
 
     def set_clip(self: Frame, rect: Rect | None) -> None:
+
         self.buffer.set_clip(rect)
 
     def clear_clip(self: Frame) -> None:
+
         self.buffer.set_clip(None)
 
     def with_clip(self: Frame, rect: Rect) -> Frame:
+
         self.push_clip(rect)
         return self
 
     def get_clip(self: Frame) -> Rect | None:
+
         return self.buffer.get_clip()
 
     def write_string(self: Frame, x: int, y: int, text: str, style: Style | None = None, max_width: int = -1) -> int:
+
         return self.buffer.write_string(x, y, text, style, max_width)
 
     def fill_rect(self: Frame, x: int, y: int, w: int, h: int, char: str = " ", style: Style | None = None) -> None:
+
         self.buffer.fill_rect(x, y, w, h, char, style)
 
 class TuiApp:
@@ -57,16 +80,94 @@ class TuiApp:
         self.title = title
 
     def init(self: TuiApp) -> None:
+
         pass
 
     def update(self: TuiApp, event: Event) -> bool:
+
         if event.is_key("q") or event.is_ctrl("c") or event.is_key("esc"):
             self.running = False
             return False
         return True
 
     def view(self: TuiApp, frame: Frame) -> None:
+
         pass
+
+def _mono_ms() -> int:
+    return nox.time.monotonic_ns() // 1000000
+
+class TerminalSession:
+    driver: TerminalDriver
+    raw_enabled: bool
+    active: bool
+    use_raw: bool
+    use_alt_screen: bool
+    hide_cursor: bool
+
+    def __init__(self: TerminalSession, driver: TerminalDriver, use_raw: bool = True, use_alt_screen: bool = True, hide_cursor: bool = True) -> None:
+        self.driver = driver
+        self.raw_enabled = False
+        self.active = False
+        self.use_raw = use_raw
+        self.use_alt_screen = use_alt_screen
+        self.hide_cursor = hide_cursor
+
+    @property
+    def is_open(self: TerminalSession) -> bool:
+
+        return self.active
+
+    @property
+    def is_raw(self: TerminalSession) -> bool:
+
+        return self.raw_enabled
+
+    def __enter__(self: TerminalSession) -> TerminalSession:
+
+        discard_raw: bool = self.open()
+        return self
+
+    def __exit__(self: TerminalSession) -> None:
+
+        self.close()
+
+    def __del__(self: TerminalSession) -> None:
+
+        if self.active:
+            self.close()
+
+    def open(self: TerminalSession) -> bool:
+
+        if self.active:
+            return self.raw_enabled
+        self.active = True
+        if self.use_raw and not self.driver.capture_mode and nox.terminal.is_tty(0):
+            try:
+                nox.terminal.enable_raw_mode()
+                self.raw_enabled = True
+            except TerminalError:
+                self.raw_enabled = False
+        if self.use_alt_screen:
+            self.driver.enter_alt_screen()
+        if self.hide_cursor:
+            self.driver.hide_cursor()
+        return self.raw_enabled
+
+    def close(self: TerminalSession) -> None:
+
+        if not self.active:
+            return
+        self.active = False
+        try:
+            self.driver.restore()
+        finally:
+            if self.raw_enabled:
+                self.raw_enabled = False
+                try:
+                    nox.terminal.disable_raw_mode()
+                except TerminalError:
+                    nox.terminal.restore_state()
 
 class AppRunner:
     app: TuiApp
@@ -79,13 +180,7 @@ class AppRunner:
     esc_timeout_ms: int
     esc_pending_ms: int
 
-    def __init__(
-        self: AppRunner,
-        app: TuiApp,
-        driver: TerminalDriver | None = None,
-        tick_rate_ms: int = 100,
-        auto_clear: bool = True
-    ) -> None:
+    def __init__(self: AppRunner, app: TuiApp, driver: TerminalDriver | None = None, tick_rate_ms: int = 100, auto_clear: bool = True) -> None:
         self.app = app
         if driver != None:
             self.driver = driver
@@ -102,12 +197,15 @@ class AppRunner:
         self.esc_pending_ms = 0
 
     def queue_event(self: AppRunner, ev: Event) -> None:
+
         self.input_queue.append(ev)
 
     def queue_key(self: AppRunner, key: str, ctrl: bool = False, alt: bool = False, shift: bool = False) -> None:
+
         self.input_queue.append(make_key_event(key, ctrl, alt, shift))
 
     def queue_raw(self: AppRunner, raw: str) -> None:
+
         keys: list[KeyEvent] = self.decoder.feed(raw)
         idx: int = 0
         while idx < len(keys):
@@ -118,6 +216,7 @@ class AppRunner:
             self.esc_pending_ms = 0
 
     def render_frame(self: AppRunner) -> None:
+
         if self.auto_clear:
             self.driver.current_buffer.clear()
         self.driver.current_buffer.set_clip(None)
@@ -130,6 +229,7 @@ class AppRunner:
         self.frame_count = self.frame_count + 1
 
     def check_esc_timeout(self: AppRunner, delta_ms: int) -> None:
+
         if len(self.decoder.buffer) > 0:
             self.esc_pending_ms = self.esc_pending_ms + delta_ms
             if self.esc_pending_ms >= self.esc_timeout_ms:
@@ -138,6 +238,7 @@ class AppRunner:
             self.esc_pending_ms = 0
 
     def flush_pending_input(self: AppRunner) -> None:
+
         if len(self.decoder.buffer) > 0:
             flushed: list[KeyEvent] = self.decoder.flush()
             f_idx: int = 0
@@ -148,6 +249,7 @@ class AppRunner:
             self.esc_pending_ms = 0
 
     def process_input_queue(self: AppRunner) -> None:
+
         if len(self.input_queue) == 0:
             return
 
@@ -171,6 +273,7 @@ class AppRunner:
             self.render_frame()
 
     def step(self: AppRunner, event: Event) -> bool:
+
         if event.is_tick():
             self.check_esc_timeout(event.delta_ms)
         keep: bool = self.app.update(event)
@@ -181,6 +284,7 @@ class AppRunner:
         return True
 
     def run_event_stream(self: AppRunner, event_list: list[Event]) -> int:
+
         self.app.init()
         self.render_frame()
 
@@ -197,26 +301,78 @@ class AppRunner:
         self.process_input_queue()
         return self.frame_count
 
+    def _poll_live_resize(self: AppRunner) -> None:
+
+        if self.driver.capture_mode or not self.driver.options.is_tty:
+            return
+        sz: TerminalSize = nox.terminal.get_size()
+        if sz.cols > 0 and sz.rows > 0:
+            if sz.cols != self.driver.current_buffer.width or sz.rows != self.driver.current_buffer.height:
+                self.driver.resize(sz.cols, sz.rows)
+                self.input_queue.append(make_resize_event(sz.cols, sz.rows))
+
+    def _drain_raw_input(self: AppRunner) -> None:
+
+        while self.app.running:
+            chunk: str = nox.terminal.read_raw(256)
+            if nox.strings.byte_len(chunk) == 0:
+                break
+            self.queue_raw(chunk)
+
     def run_interactive(self: AppRunner, max_frames: int = -1) -> None:
-        # 1. Setup terminal environment inside try...finally
+
+        session: TerminalSession = TerminalSession(self.driver, not self.driver.capture_mode, True, True)
+        sig_int: int = nox.signal.sigint()
+        sig_term: int = nox.signal.sigterm()
+        sig_watched: bool = False
+        if not self.driver.capture_mode:
+            sig_watched = nox.signal.install(sig_int) or nox.signal.install(sig_term)
+
         try:
-            self.driver.enter_alt_screen()
-            self.driver.hide_cursor()
+            session.open()
+            self._poll_live_resize()
             self.app.init()
             self.render_frame()
+            last_tick_ms: int = _mono_ms()
 
-            # 2. Main loop
             while self.app.running:
                 if max_frames >= 0 and self.frame_count >= max_frames:
                     break
-                self.process_input_queue()
-                if not self.app.running:
+                if sig_watched and (nox.signal.take(sig_int) or nox.signal.take(sig_term)):
+                    self.app.running = False
                     break
-                # Tick sleep
-                nox.time.sleep_ms(self.tick_rate_ms)
-                step_res: bool = self.step(make_tick_event(self.tick_rate_ms))
-                if not step_res:
-                    break
+
+                self._poll_live_resize()
+
+                if session.raw_enabled:
+                    now_ms: int = _mono_ms()
+                    elapsed_ms: int = now_ms - last_tick_ms
+                    rem_ms: int = self.tick_rate_ms - elapsed_ms
+                    if rem_ms < 1:
+                        rem_ms = 1
+                    has_input: bool = nox.terminal.poll_input(rem_ms)
+                    if sig_watched and (nox.signal.take(sig_int) or nox.signal.take(sig_term)):
+                        self.app.running = False
+                        break
+                    if has_input:
+                        self._drain_raw_input()
+                    self.process_input_queue()
+                    if not self.app.running:
+                        break
+                    after_ms: int = _mono_ms()
+                    tick_delta: int = after_ms - last_tick_ms
+                    if tick_delta >= self.tick_rate_ms:
+                        last_tick_ms = after_ms
+                        step_res: bool = self.step(make_tick_event(tick_delta))
+                        if not step_res:
+                            break
+                else:
+                    self.process_input_queue()
+                    if not self.app.running:
+                        break
+                    nox.time.sleep_ms(self.tick_rate_ms)
+                    step_res2: bool = self.step(make_tick_event(self.tick_rate_ms))
+                    if not step_res2:
+                        break
         finally:
-            # 3. Always restore terminal state cleanly, even on error or early break
-            self.driver.restore()
+            session.close()
