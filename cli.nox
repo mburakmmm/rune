@@ -2,14 +2,14 @@
 
 import nox.strings
 import nox.os
-import core
-from core import Console, Style, cell_width, get_env_safe
-import arguments
-from arguments import Argument, ArgType, arg_type_name, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
-import options
-from options import Option
-import errors
-from errors import CliError, UsageError, UnknownOptionError, MissingArgumentError, MissingOptionValueError, InvalidTypeError, CommandNotFoundError
+import rune.core
+from rune.core import Console, Style, cell_width, get_env_safe
+import rune.arguments
+from rune.arguments import Argument, ArgType, arg_type_name, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+import rune.options
+from rune.options import Option
+import rune.errors
+from rune.errors import CliError, UsageError, UnknownOptionError, MissingArgumentError, MissingOptionValueError, InvalidTypeError, CommandNotFoundError
 
 class CliContext:
     values: dict[str, str]

@@ -1,2 +1,2 @@
 import core
-from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, normalize_text, upper_tr, lower_tr, esc_code, reset_code
+from core import Style, ConsoleOptions, Console, strip_ansi, sanitize_ansi, cell_width, normalize_text, upper_tr, lower_tr, esc_code, reset_code, get_env_safe

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-11-15
+
+### Fixed
+- CLI modules import `rune.core`, `rune.arguments`, `rune.options`, and `rune.errors`, so another package can `import rune.cli`. Facades under `rune/` keep those names working when Rune itself is the program being compiled.
+
 ## [2.0.0] - 2026-11-15
 
 ### Added & Modernized (Path B: Nox `2.1` Language, Performance & API Release)

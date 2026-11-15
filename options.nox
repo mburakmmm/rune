@@ -1,7 +1,7 @@
 # options.nox — Option and flag definitions with environment, choices, and repetition support.
 
-import arguments
-from arguments import ArgType, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
+import rune.arguments
+from rune.arguments import ArgType, TYPE_STR, TYPE_INT, TYPE_FLOAT, TYPE_BOOL
 
 class Option:
     name: str
