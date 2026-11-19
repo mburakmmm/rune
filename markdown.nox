@@ -8,6 +8,8 @@ from core import Style, ConsoleOptions, sanitize_ansi, cell_width
 import syntax
 from syntax import Syntax
 
+__all__: list[str] = ["format_inline_markdown", "Markdown", "render_markdown"]
+
 def repeat_str(ch: str, count: int) -> str:
     if count <= 0:
         return ""

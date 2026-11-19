@@ -11,6 +11,8 @@ from rune.options import Option
 import rune.errors
 from rune.errors import CliError, UsageError, UnknownOptionError, MissingArgumentError, MissingOptionValueError, InvalidTypeError, CommandNotFoundError
 
+__all__: list[str] = ["CliContext", "CliResult", "Command", "CliApp"]
+
 class CliContext:
     values: dict[str, str]
     list_values: dict[str, list[str]]

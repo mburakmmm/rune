@@ -4,6 +4,8 @@ import nox.strings
 import core
 from core import Style, ConsoleOptions, cell_width, strip_ansi
 
+__all__: list[str] = ["Panel"]
+
 class Panel:
     content: str
     title: str
@@ -13,16 +15,7 @@ class Panel:
     width: int
     style: Style
 
-    def __init__(
-        self: Panel,
-        content: str,
-        title: str = "",
-        subtitle: str = "",
-        border_style: str = "rounded",
-        padding: int = 1,
-        width: int = 0,
-        style: Style | None = None
-    ) -> None:
+    def __init__(self: Panel, content: str, title: str = "", subtitle: str = "", border_style: str = "rounded", padding: int = 1, width: int = 0, style: Style | None = None) -> None:
         self.content = content
         self.title = title
         self.subtitle = subtitle
@@ -35,6 +28,7 @@ class Panel:
             self.style = Style()
 
     def render(self: Panel, options: ConsoleOptions) -> str:
+
         tl: str = "╭"
         tr: str = "╮"
         bl: str = "╰"
@@ -42,28 +36,31 @@ class Panel:
         h: str = "─"
         v: str = "│"
 
-        use_ascii: bool = not options.supports_unicode or self.border_style == "ascii"
-        if use_ascii:
+        if not options.supports_unicode or self.border_style == "ascii":
             tl = "+"
             tr = "+"
             bl = "+"
             br = "+"
             h = "-"
             v = "|"
-        elif self.border_style == "square":
-            tl = "┌"
-            tr = "┐"
-            bl = "└"
-            br = "┘"
-            h = "─"
-            v = "│"
-        elif self.border_style == "double":
-            tl = "╔"
-            tr = "╗"
-            bl = "╚"
-            br = "╝"
-            h = "═"
-            v = "║"
+        else:
+            match self.border_style:
+                case "square":
+                    tl = "┌"
+                    tr = "┐"
+                    bl = "└"
+                    br = "┘"
+                    h = "─"
+                    v = "│"
+                case "double":
+                    tl = "╔"
+                    tr = "╗"
+                    bl = "╚"
+                    br = "╝"
+                    h = "═"
+                    v = "║"
+                case _:
+                    pass
 
         lines: list[str] = nox.strings.split(self.content, "\n")
         max_content_w: int = 0
@@ -83,7 +80,7 @@ class Panel:
             max_content_w = s_cw + 4
 
         # Compute inner content width
-        inner_w: int = max_content_w + (self.padding * 2)
+        inner_w: int = max_content_w + self.padding * 2
         if self.width > 2:
             inner_w = self.width - 2
 

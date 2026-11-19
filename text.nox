@@ -4,6 +4,8 @@ import nox.strings
 import core
 from core import Style, ConsoleOptions, cell_width, strip_ansi
 
+__all__: list[str] = ["Span", "Text"]
+
 class Span:
     content: str
     style: Style
@@ -24,10 +26,12 @@ class Text:
             self.spans.append(Span(initial, style))
 
     def append(self: Text, content: str, style: Style | None = None) -> Text:
+
         self.spans.append(Span(content, style))
         return self
 
     def plain_text(self: Text) -> str:
+
         parts: list[str] = []
         i: int = 0
         while i < len(self.spans):
@@ -36,9 +40,11 @@ class Text:
         return nox.strings.join(parts, "")
 
     def cell_width(self: Text) -> int:
+
         return cell_width(self.plain_text())
 
     def render(self: Text, options: ConsoleOptions) -> str:
+
         if not options.supports_color:
             return strip_ansi(self.plain_text())
 

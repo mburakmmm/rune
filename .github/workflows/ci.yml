@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NOX_VERSION: v2.1.186
+  NOX_VERSION: v2.2.38
 
 jobs:
   test:
@@ -51,6 +51,9 @@ jobs:
         run: |
           noxc check rune.nox
           noxc check main.nox
+          noxc check --strict-spawn-shared rune.nox
+          noxc sbom . -o rune-sbom.cdx.json
+          rm -f rune-sbom.cdx.json
 
       - name: Run Test Suites
         run: |

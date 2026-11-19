@@ -6,6 +6,8 @@ from nox.terminal import TerminalError
 import core
 from core import Console, ConsoleOptions, Style
 
+__all__: list[str] = ["PromptError", "NonInteractiveError", "prompt_text", "prompt_int", "confirm", "select_choice", "select_multiple", "prompt_password"]
+
 class PromptError(Exception):
     pass
 
@@ -227,7 +229,7 @@ def prompt_password(question: str, console: Console | None = None, default_val: 
     try:
         nox.terminal.set_echo(False)
     except TerminalError as err:
-        raise PromptError("Echo-suppressed password input is not supported on this terminal: " + str(err))
+        raise PromptError("Echo-suppressed password input is not supported on this terminal: " + str(err)) from err
 
     con.write(question + ": ")
     pw: str = ""

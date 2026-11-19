@@ -6,6 +6,8 @@ from nox.os import OsError
 import nox.terminal
 import nox.unicode
 
+__all__: list[str] = ["esc_code", "reset_code", "clamp_byte", "color_256", "bg_256", "color_rgb", "bg_rgb", "hex_to_rgb", "hex_to_bg_rgb", "resolve_color_code", "resolve_bg_code", "Style", "strip_ansi", "sanitize_ansi", "char_width", "normalize_text", "upper_tr", "lower_tr", "cell_width", "truncate", "wrap_text", "get_env_safe", "ConsoleOptions", "detect_console_options", "Console"]
+
 # ASCII Escape Byte
 def esc_code() -> str:
     return nox.strings.char_from_byte(27)
@@ -122,39 +124,41 @@ def resolve_color_code(name: str) -> str:
         if _is_safe_sgr_params(clean):
             return clean
         return ""
-    if clean == "black":
-        return COLOR_BLACK
-    if clean == "red":
-        return COLOR_RED
-    if clean == "green":
-        return COLOR_GREEN
-    if clean == "yellow":
-        return COLOR_YELLOW
-    if clean == "blue":
-        return COLOR_BLUE
-    if clean == "magenta" or clean == "purple":
-        return COLOR_MAGENTA
-    if clean == "cyan":
-        return COLOR_CYAN
-    if clean == "white":
-        return COLOR_WHITE
-    if clean == "gray" or clean == "grey" or clean == "bright_black":
-        return COLOR_BRIGHT_BLACK
-    if clean == "bright_red":
-        return COLOR_BRIGHT_RED
-    if clean == "bright_green":
-        return COLOR_BRIGHT_GREEN
-    if clean == "bright_yellow":
-        return COLOR_BRIGHT_YELLOW
-    if clean == "bright_blue":
-        return COLOR_BRIGHT_BLUE
-    if clean == "bright_magenta":
-        return COLOR_BRIGHT_MAGENTA
-    if clean == "bright_cyan":
-        return COLOR_BRIGHT_CYAN
-    if clean == "bright_white":
-        return COLOR_BRIGHT_WHITE
-    return ""
+    match clean:
+        case "black":
+            return COLOR_BLACK
+        case "red":
+            return COLOR_RED
+        case "green":
+            return COLOR_GREEN
+        case "yellow":
+            return COLOR_YELLOW
+        case "blue":
+            return COLOR_BLUE
+        case "magenta" | "purple":
+            return COLOR_MAGENTA
+        case "cyan":
+            return COLOR_CYAN
+        case "white":
+            return COLOR_WHITE
+        case "gray" | "grey" | "bright_black":
+            return COLOR_BRIGHT_BLACK
+        case "bright_red":
+            return COLOR_BRIGHT_RED
+        case "bright_green":
+            return COLOR_BRIGHT_GREEN
+        case "bright_yellow":
+            return COLOR_BRIGHT_YELLOW
+        case "bright_blue":
+            return COLOR_BRIGHT_BLUE
+        case "bright_magenta":
+            return COLOR_BRIGHT_MAGENTA
+        case "bright_cyan":
+            return COLOR_BRIGHT_CYAN
+        case "bright_white":
+            return COLOR_BRIGHT_WHITE
+        case _:
+            return ""
 
 def resolve_bg_code(name: str) -> str:
     clean: str = nox.strings.lower(nox.strings.trim(name))
@@ -164,23 +168,25 @@ def resolve_bg_code(name: str) -> str:
         if _is_safe_sgr_params(clean):
             return clean
         return ""
-    if clean == "black":
-        return BG_BLACK
-    if clean == "red":
-        return BG_RED
-    if clean == "green":
-        return BG_GREEN
-    if clean == "yellow":
-        return BG_YELLOW
-    if clean == "blue":
-        return BG_BLUE
-    if clean == "magenta" or clean == "purple":
-        return BG_MAGENTA
-    if clean == "cyan":
-        return BG_CYAN
-    if clean == "white":
-        return BG_WHITE
-    return ""
+    match clean:
+        case "black":
+            return BG_BLACK
+        case "red":
+            return BG_RED
+        case "green":
+            return BG_GREEN
+        case "yellow":
+            return BG_YELLOW
+        case "blue":
+            return BG_BLUE
+        case "magenta" | "purple":
+            return BG_MAGENTA
+        case "cyan":
+            return BG_CYAN
+        case "white":
+            return BG_WHITE
+        case _:
+            return ""
 
 class Style:
     def __init__(self: Style, fg: str = "", bg: str = "", bold: bool = False, dim: bool = False, italic: bool = False, underline: bool = False, reverse: bool = False) -> None:
@@ -397,7 +403,20 @@ def lower_tr(s: str) -> str:
     return nox.unicode.lower_tr(s)
 
 def cell_width(s: str) -> int:
-    clean: str = nox.unicode.normalize(strip_ansi(s), "NFC")
+    raw_clean: str = strip_ansi(s)
+    bn: int = nox.strings.byte_len(raw_clean)
+    if bn == 0:
+        return 0
+    bi: int = 0
+    while bi < bn:
+        b: int = nox.strings.byte_at(raw_clean, bi)
+        if b < 32 or b >= 127:
+            break
+        bi = bi + 1
+    else:
+        return bn
+
+    clean: str = nox.unicode.normalize(raw_clean, "NFC")
     w: int = 0
     i: int = 0
     n: int = len(clean)

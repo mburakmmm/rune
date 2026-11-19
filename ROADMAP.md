@@ -35,6 +35,7 @@
 | **Phase 10.5: Atomic Cell Transactions** | `v1.4.5` | Atomic cell pre-flight verification, invariant validation, `NOX_LIMITATIONS.md` expansion | **Completed** | `tui_widgets_test` (22 suites) |
 | **Phase 11: Real Terminal & Stdlib Integration (Path A)** | `v1.5.0` | `nox.terminal`, `nox.signal`, monotonic timing, NFC Unicode, live TUI I/O, `prompt_password`, `nox.property` fuzzing | **Completed** | `terminal_runtime_test`, `property_fuzz_test` (24 suites) |
 | **Phase 12: Nox 2.1 Language & Perf Modernization (Path B)** | `v2.0.0` | `enum`/`match`, `@dataclass`, `@property`, `*args`, `with`/`__del__`, `yield`, `nox.regex`, slice/zero-alloc hot paths | **Completed** | `modern_v2_test`, full `2.0.0` suite (25 suites) |
+| **Phase 13: Nox 2.2.38 Language, `__all__` & Hot-Path Tuning** | `v2.1.0` | Scalar `match`, `__all__` visibility, multiline imports, `raise from`, `syntax.nox` 2.2 lexicon, ASCII `cell_width` fast-path, Windows/CI `2.2.38` alignment | **Completed** | `nox22_surface_test`, full `2.1.0` suite (26 suites) |
 
 ---
 
@@ -482,6 +483,25 @@ All deliverables from the initial autonomous implementation task (`AGENTS.md §2
 - [x] **2.0 Release, Benchmarks, Fuzz & Migration Docs**:
   - Added `tests/unit/modern_v2_test.nox` and verified all 25 test suites + all 11 examples + `benchmarks/run_benchmarks.nox`.
   - Updated `nox.json` to `2.0.0`, updated `rune.nox` and `rune/*.nox` re-exports, completed `docs/migration.md` (`1.x -> 2.0.0`), `docs/api.md`, `README.md`, `CHANGELOG.md`, and ran `noxc fmt`, `noxc check`, and full `noxc test`.
+
+---
+
+### ✨ v2.1.0 — Phase 13: Nox 2.2.38 Adoption, `__all__` Hygiene & Hot-Path Tuning (Completed)
+**Goal:** Align Rune with Nox `v2.2.38` (`v2.1.187..v2.2.38`), adopt scalar `match` jump tables, opt-in module `__all__` API hygiene, multiline imports, `raise from` error chaining, updated syntax highlighting, ASCII fast-path width measurement, and CI/SBOM checks while preserving 0 native C dependencies.
+
+- [x] **CI, Capabilities & Limitations Alignment (`noxc 2.2.38`)**:
+  - Upgraded `.github/workflows/ci.yml` `NOX_VERSION` to `v2.2.38` and added `--strict-spawn-shared` + `noxc sbom` verification.
+  - Updated `NOX_LIMITATIONS.md` & `docs/capabilities.md` with `write_raw` Windows/redirect support, `nox.signal` Windows console event support, and pure-Zig `nox.regex` vs `nox.pcre2` policy.
+- [x] **Scalar `match` & Control-Flow Modernization**:
+  - Migrated string `if/elif` chains in `core.nox`, `panel.nox`, `table.nox`, `widgets.nox`, `rule.nox`, and `completion.nox` to scalar `match ... case "a" | "b":`.
+  - Used `from ... import (...)` multiline imports in `rune.nox`, `rune/tui.nox`, `rune/core.nox`, `tui.nox`, `tui_runtime.nox`, and `cli.nox`, plus `raise ... from err` cause preservation in `prompt.nox`.
+- [x] **Opt-In `__all__` API Hygiene**:
+  - Added compile-time `__all__` export lists to class/function modules so internal helpers are blocked cleanly from external module imports.
+- [x] **`syntax.nox` 2.2 Lexicon & Hot-Path Optimizations**:
+  - Updated `syntax.nox` `NOX_KEYWORDS` / `NOX_BUILTINS` and raw/f-string (`r"..."`, `f"..."`) highlighting for Nox `2.2.38`.
+  - Added pure-ASCII fast-path to `cell_width()` in `core.nox`, slice optimization to `completion.sanitize_shell_str()`, and re-benchmarked on `2.2.38`.
+- [x] **Tests, Docs & Release `v2.1.0`**:
+  - Added `tests/unit/nox22_surface_test.nox`, updated `nox.json` / `main.nox` / `CHANGELOG.md` / `README.md`, formatted via `noxc fmt`, checked with `--strict-spawn-shared`, and verified all 26 test suites.
 
 ---
 

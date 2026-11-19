@@ -4,6 +4,8 @@ import nox.strings
 import core
 from core import Style, ConsoleOptions, cell_width, strip_ansi, wrap_text
 
+__all__: list[str] = ["Column", "Row", "Table"]
+
 class Column:
     title: str
     align: str
@@ -65,15 +67,15 @@ class Table:
         if cw >= width:
             return text
         diff: int = width - cw
-        if align == "right":
-            return nox.strings.repeat(" ", diff) + text
-        elif align == "center":
-            left_p: int = diff // 2
-            right_p: int = diff - left_p
-            return nox.strings.repeat(" ", left_p) + text + nox.strings.repeat(" ", right_p)
-        else:
-            # left
-            return text + nox.strings.repeat(" ", diff)
+        match align:
+            case "right":
+                return nox.strings.repeat(" ", diff) + text
+            case "center":
+                left_p: int = diff // 2
+                right_p: int = diff - left_p
+                return nox.strings.repeat(" ", left_p) + text + nox.strings.repeat(" ", right_p)
+            case _:
+                return text + nox.strings.repeat(" ", diff)
 
     def _get_cell_lines(self: Table, cell_str: str, col_def: Column) -> list[str]:
 

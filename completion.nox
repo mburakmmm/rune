@@ -8,18 +8,31 @@ from options import Option
 import cli
 from cli import Command
 
+__all__: list[str] = ["sanitize_shell_str", "collect_command_names", "collect_options_tokens", "generate_bash_completion", "generate_fish_completion", "generate_zsh_completion", "generate_completion"]
+
 def sanitize_shell_str(s: str) -> str:
-    res: str = ""
-    i: int = 0
     n: int = len(s)
+    if n == 0:
+        return ""
+    parts: list[str] = []
+    span_start: int = 0
+    i: int = 0
     while i < n:
         c: str = s[i]
         if c == "\"" or c == "'" or c == "`" or c == "$" or c == "\\" or c == ";" or c == "&" or c == "|" or c == ">" or c == "<":
-            res = res + ""
+            if i > span_start:
+                parts.append(s[span_start:i])
+            i = i + 1
+            span_start = i
         else:
-            res = res + c
-        i = i + 1
-    return res
+            i = i + 1
+    if span_start == 0:
+        return s
+    if span_start < n:
+        parts.append(s[span_start:n])
+    if len(parts) == 0:
+        return ""
+    return nox.strings.join(parts, "")
 
 def collect_command_names(cmd: Command) -> list[str]:
     names: list[str] = []
@@ -198,10 +211,12 @@ def generate_zsh_completion(cmd: Command) -> str:
 
 def generate_completion(cmd: Command, shell: str) -> str:
     sh: str = nox.strings.lower(shell)
-    if sh == "bash":
-        return generate_bash_completion(cmd)
-    if sh == "fish":
-        return generate_fish_completion(cmd)
-    if sh == "zsh":
-        return generate_zsh_completion(cmd)
-    return "# Unsupported shell: " + shell + " (supported: bash, zsh, fish)"
+    match sh:
+        case "bash":
+            return generate_bash_completion(cmd)
+        case "fish":
+            return generate_fish_completion(cmd)
+        case "zsh":
+            return generate_zsh_completion(cmd)
+        case _:
+            return "# Unsupported shell: " + shell + " (supported: bash, zsh, fish)"

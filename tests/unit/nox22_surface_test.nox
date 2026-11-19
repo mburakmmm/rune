@@ -1,0 +1,73 @@
+# tests/unit/nox22_surface_test.nox — Tests for Rune v2.1.0 adopting Nox 2.2.38 language & stdlib features.
+
+import nox.test
+import nox.strings
+import nox.os
+import rune
+from rune import Style, ConsoleOptions, Console, cell_width, strip_ansi, Rule, Panel, Table, Syntax, Live, Command, generate_completion, Rect, ScreenBuffer, Block, Paragraph, MockTerminalDriver, TerminalSession
+from rune.core import resolve_color_code, resolve_bg_code
+
+def run_nox22_tests() -> None:
+    # 1. Scalar match dispatch across styling and rendering primitives
+    nox.test.assert_eq_str(resolve_color_code("purple"), "35", "resolve_color_code purple -> 35 via match")
+    nox.test.assert_eq_str(resolve_color_code("grey"), "90", "resolve_color_code grey -> 90 via match")
+    nox.test.assert_eq_str(resolve_bg_code("magenta"), "45", "resolve_bg_code magenta -> 45 via match")
+
+    opts_uni := ConsoleOptions(False, True, 40, 24, False, True, False)
+    opts_color := ConsoleOptions(True, True, 80, 24, True, True, True)
+
+    pnl_dbl := Panel("Hi", "T", "", "double", 1, 0, None).render(opts_uni)
+    nox.test.assert_true(nox.strings.contains(pnl_dbl, "╔"), "Panel double border via scalar match")
+
+    rl_left := Rule("Go", "─", "left").render(ConsoleOptions(False, True, 16, 24, False, True, False))
+    nox.test.assert_true(nox.strings.starts_with(rl_left, "── Go "), "Rule left align via scalar match")
+
+    buf := ScreenBuffer(12, 4)
+    blk := Block("B", "right", "double")
+    blk.render(Rect(0, 0, 12, 4), buf)
+    para := Paragraph("OK", None, True, 0, "right")
+    para.render(blk.inner(Rect(0, 0, 12, 4)), buf)
+    buf_txt := buf.to_text()
+    nox.test.assert_true(nox.strings.contains(buf_txt, "╔") and nox.strings.contains(buf_txt, "OK"), "Block + Paragraph scalar match")
+
+    cmd := Command("noxapp", "Demo")
+    nox.test.assert_true(nox.strings.contains(generate_completion(cmd, "FISH"), "complete -c noxapp"), "Completion fish dispatch via match")
+
+    # 2. cell_width ASCII fast-path vs NFC Unicode & ANSI stripping
+    nox.test.assert_eq_int(cell_width("Hello, Rune!"), 12, "cell_width pure ASCII fast-path")
+    nox.test.assert_eq_int(cell_width(Style("green", "", True).apply("OK")), 2, "cell_width ANSI + ASCII fast-path")
+    decomposed := "é"
+    nox.test.assert_eq_int(cell_width(decomposed), 1, "cell_width falls back cleanly to NFC for decomposed chars")
+    nox.test.assert_eq_int(cell_width("界"), 2, "cell_width CJK double width")
+
+    # 3. Syntax highlighter Nox 2.2 keywords, builtins, and raw strings
+    raw_code := "global x\nx = pow(2, 5, 7)\ns = r\"a\\nb\" + hex(15)"
+    syn_plain := strip_ansi(Syntax(raw_code, "nox", False).render(opts_color))
+    nox.test.assert_eq_str(syn_plain, raw_code, "Syntax preserves Nox 2.2 code and raw string literally")
+    syn_colored := Syntax(raw_code, "nox", False).render(opts_color)
+    nox.test.assert_true(len(syn_colored) > len(raw_code), "Syntax applies ANSI styles to Nox 2.2 tokens")
+
+    # 4. Multi-resource with statement cleanup
+    con_live := Console(opts_uni)
+    drv := MockTerminalDriver(30, 8)
+    with TerminalSession(drv, False, True, True) as sess:
+        with Live(con_live, True) as live:
+            nox.test.assert_true(sess.is_open and live.active, "Both resources active inside multi-with")
+            live.update("step 1")
+    nox.test.assert_true(not sess.is_open and not drv.is_alt_screen, "TerminalSession cleaned up after multi-with")
+    nox.test.assert_true(not live.active, "Live cleaned up after multi-with")
+
+    # 5. Table alignment + nox.os.environ sanity
+    tbl := Table("Metrics", "square", None, 1)
+    tbl.add_column("Key", "left")
+    tbl.add_column("Val", "right")
+    tbl.add_cells("a", "1")
+    tbl.add_cells("bb", "22")
+    tbl_str := tbl.render(opts_uni)
+    nox.test.assert_true(nox.strings.contains(tbl_str, "┌") and nox.strings.contains(tbl_str, " 1 "), "Table square border and right align")
+
+    env_map := nox.os.environ()
+    nox.test.assert_true(len(nox.os.env_names()) == len(env_map), "nox.os.environ matches env_names count")
+
+run_nox22_tests()
+print("nox22_surface_test passed")

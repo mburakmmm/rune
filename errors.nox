@@ -1,5 +1,7 @@
 # errors.nox — Structured CLI exception hierarchy.
 
+__all__: list[str] = ["CliError", "UsageError", "UnknownOptionError", "MissingArgumentError", "MissingOptionValueError", "InvalidTypeError", "CommandNotFoundError"]
+
 class CliError(Exception):
     pass
 

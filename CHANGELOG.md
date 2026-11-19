@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-11-19
+
+### Added & Modernized (Nox `2.2.38` Language Surface, API Hygiene & Hot-Path Tuning)
+- **Scalar `match` Jump Tables (`core.nox`, `panel.nox`, `table.nox`, `widgets.nox`, `rule.nox`, `completion.nox`)**:
+  - Replaced long string `if/elif` chains for color names (`resolve_color_code`, `resolve_bg_code`), border styles, alignments, and shell targets (`generate_completion`) with scalar `match` and `|` alternatives.
+- **Opt-In `__all__` API Hygiene & Multiline Imports**:
+  - Added compile-time `__all__` export lists across class/function modules (`core.nox`, `cli.nox`, `completion.nox`, `errors.nox`, `markdown.nox`, `panel.nox`, `progress.nox`, `prompt.nox`, `rule.nox`, `syntax.nox`, `table.nox`, `text.nox`, `tree.nox`, `tui_runtime.nox`, `widgets.nox`) so internal helpers stay encapsulated.
+  - Reformatted long facade imports in `rune.nox`, `rune/tui.nox`, `rune/core.nox`, `tui.nox`, `tui_runtime.nox`, and `cli.nox` to multiline `from ... import (...)` syntax.
+- **Error Cause Chaining & Nox 2.2 Syntax Highlighting (`prompt.nox`, `syntax.nox`)**:
+  - Preserved underlying `TerminalError` causes in `prompt_password()` via `raise PromptError(...) from err`.
+  - Updated `syntax.nox` `NOX_KEYWORDS` (`enum`, `global`, `nonlocal`), `NOX_BUILTINS` (`pow`, `hex`, `oct`, `bin`, `sum`, `enumerate`, `zip`, `min`, `max`, `abs`, `round`, `sorted`, `repr`), and raw/f-string prefix literal (`r"..."`, `f"..."`) lexing.
+- **Performance & Capabilities Alignment (`core.nox`, `completion.nox`, CI/Docs)**:
+  - Added pure-ASCII printable fast-path to `cell_width()` (7x faster 1,000-row table benchmark: `14 ms -> 2 ms` on `noxc 2.2.38`) and slice-based scanning to `sanitize_shell_str()`.
+  - Updated `.github/workflows/ci.yml` to `NOX_VERSION: v2.2.38` with `--strict-spawn-shared` and `noxc sbom` verification.
+  - Updated `NOX_LIMITATIONS.md` & `docs/capabilities.md` for `nox.terminal.write_raw` Windows/pipe support and `nox.signal` Windows console events (`SIGINT`/`SIGTERM`/`SIGHUP`).
+- **Tests**:
+  - Added [tests/unit/nox22_surface_test.nox](tests/unit/nox22_surface_test.nox) verifying scalar `match`, ASCII + NFC `cell_width()`, multi-resource `with`, `syntax.nox` 2.2 tokens, and `nox.os.environ()` (26 total test suites).
+
+---
+
 ## [2.0.1] - 2026-11-15
 
 ### Fixed

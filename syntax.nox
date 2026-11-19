@@ -4,9 +4,11 @@ import nox.strings
 import core
 from core import Style, ConsoleOptions, sanitize_ansi
 
-NOX_KEYWORDS: list[str] = ["def", "class", "import", "from", "return", "if", "else", "elif", "for", "in", "while", "break", "continue", "pass", "raise", "try", "except", "finally", "is", "not", "and", "or", "True", "False", "None", "self", "let", "fn", "const", "var", "yield", "async", "await", "as", "with", "lambda", "match", "case"]
+__all__: list[str] = ["SyntaxTheme", "Syntax", "highlight_line", "highlight_code"]
 
-NOX_BUILTINS: list[str] = ["int", "str", "float", "bool", "list", "dict", "tuple", "void", "Any", "bytes", "print", "len", "range", "type"]
+NOX_KEYWORDS: list[str] = ["def", "class", "enum", "import", "from", "return", "if", "else", "elif", "for", "in", "while", "break", "continue", "pass", "raise", "try", "except", "finally", "is", "not", "and", "or", "True", "False", "None", "self", "global", "nonlocal", "let", "fn", "const", "var", "yield", "async", "await", "as", "with", "lambda", "match", "case"]
+
+NOX_BUILTINS: list[str] = ["int", "str", "float", "bool", "list", "dict", "tuple", "void", "Any", "bytes", "print", "len", "range", "type", "pow", "hex", "oct", "bin", "sum", "enumerate", "zip", "min", "max", "abs", "round", "sorted", "repr"]
 
 TWO_CHAR_OPS: list[str] = ["->", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/="]
 
@@ -73,7 +75,23 @@ def highlight_line(line: str, theme: SyntaxTheme, language: str) -> str:
             parts.append(theme.comment.apply(comment_text))
             break
 
-        # 3. String literals
+        # 3. Prefixed raw/f-string literals (r"...", f"...", rf"...") and plain string literals
+        if (c == "r" or c == "f") and i + 1 < n and (line[i + 1] == "\"" or line[i + 1] == "'"):
+            is_raw: bool = c == "r"
+            q_pref: str = line[i + 1]
+            start_pref: int = i
+            i = i + 2
+            while i < n:
+                if not is_raw and line[i] == "\\":
+                    i = i + 2
+                elif line[i] == q_pref:
+                    i = i + 1
+                    break
+                else:
+                    i = i + 1
+            parts.append(theme.string_lit.apply(line[start_pref:i]))
+            continue
+
         if c == "\"" or c == "'":
             q: str = c
             start: int = i

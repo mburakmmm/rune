@@ -8,6 +8,8 @@ from layout import Rect
 import tui
 from tui import Cell, ScreenBuffer
 
+__all__: list[str] = ["Block", "Paragraph", "Gauge", "Tabs", "ListItem", "ListWidget", "TableWidget", "HelpBar"]
+
 class Block:
     title: str
     title_alignment: str
@@ -48,25 +50,28 @@ class Block:
         c_h: str = "─"
         c_v: str = "│"
 
-        if self.border_type == "square":
-            c_tl = "┌"
-            c_tr = "┐"
-            c_bl = "└"
-            c_br = "┘"
-        elif self.border_type == "double":
-            c_tl = "╔"
-            c_tr = "╗"
-            c_bl = "╚"
-            c_br = "╝"
-            c_h = "═"
-            c_v = "║"
-        elif self.border_type == "ascii":
-            c_tl = "+"
-            c_tr = "+"
-            c_bl = "+"
-            c_br = "+"
-            c_h = "-"
-            c_v = "|"
+        match self.border_type:
+            case "square":
+                c_tl = "┌"
+                c_tr = "┐"
+                c_bl = "└"
+                c_br = "┘"
+            case "double":
+                c_tl = "╔"
+                c_tr = "╗"
+                c_bl = "╚"
+                c_br = "╝"
+                c_h = "═"
+                c_v = "║"
+            case "ascii":
+                c_tl = "+"
+                c_tr = "+"
+                c_bl = "+"
+                c_br = "+"
+                c_h = "-"
+                c_v = "|"
+            case _:
+                pass
 
         # Draw top border
         buf.set(area.x, area.y, c_tl, self.border_style)
@@ -100,10 +105,13 @@ class Block:
             t_str: str = " " + self.title + " "
             t_len: int = cell_width(t_str)
             t_x: int = area.x + 2
-            if self.title_alignment == "center":
-                t_x = area.x + (area.width - t_len) // 2
-            elif self.title_alignment == "right":
-                t_x = area.x + area.width - t_len - 2
+            match self.title_alignment:
+                case "center":
+                    t_x = area.x + (area.width - t_len) // 2
+                case "right":
+                    t_x = area.x + area.width - t_len - 2
+                case _:
+                    pass
             if t_x < area.x + 1:
                 t_x = area.x + 1
             max_title_w: int = area.x + area.width - 1 - t_x
@@ -145,10 +153,13 @@ class Paragraph:
             line_str: str = lines[line_idx]
             lw: int = cell_width(line_str)
             col: int = area.x
-            if self.alignment == "center":
-                col = area.x + (area.width - lw) // 2
-            elif self.alignment == "right":
-                col = area.x + area.width - lw
+            match self.alignment:
+                case "center":
+                    col = area.x + (area.width - lw) // 2
+                case "right":
+                    col = area.x + area.width - lw
+                case _:
+                    pass
             if col < area.x:
                 col = area.x
             rem_w: int = area.x + area.width - col

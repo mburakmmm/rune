@@ -23,3 +23,4 @@
 - **v1.4.0 (Phase 10) — Event Loop & Interactive App Runner:** Completed & Published.
 - **v1.5.0 (Phase 11) — Real Terminal Runtime & Nox Stdlib Integration (Path A):** Completed (`nox.terminal`, `nox.signal`, `nox.time`, `nox.unicode`, `nox.property`).
 - **v2.0.0 (Phase 12) — Nox 2.1 Language & Perf Modernization (Path B):** Completed & Verified (`enum`/`match`, `@dataclass`, `@property`, `*args`, `with`/`__del__`, `yield`, `nox.regex`).
+- **v2.1.0 (Phase 13) — Nox 2.2.38 Adoption, `__all__` & Hot-Path Tuning:** Completed & Verified (Scalar `match`, `__all__`, multiline imports, `syntax.nox` 2.2 lexicon, ASCII `cell_width` fast-path, CI/SBOM `v2.2.38`).

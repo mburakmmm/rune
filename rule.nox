@@ -4,19 +4,15 @@ import nox.strings
 import core
 from core import Style, ConsoleOptions, cell_width, strip_ansi
 
+__all__: list[str] = ["Rule"]
+
 class Rule:
     title: str
     char: str
     align: str
     style: Style
 
-    def __init__(
-        self: Rule,
-        title: str = "",
-        char: str = "",
-        align: str = "center",
-        style: Style | None = None
-    ) -> None:
+    def __init__(self: Rule, title: str = "", char: str = "", align: str = "center", style: Style | None = None) -> None:
         self.title = title
         if len(char) > 0:
             self.char = char
@@ -29,6 +25,7 @@ class Rule:
             self.style = Style()
 
     def render(self: Rule, options: ConsoleOptions) -> str:
+
         width: int = options.width
         if width < 10:
             width = 10
@@ -57,12 +54,15 @@ class Rule:
         left_count: int = remain // 2
         right_count: int = remain - left_count
 
-        if self.align == "left":
-            left_count = 2
-            right_count = width - (t_width + 4)
-        elif self.align == "right":
-            right_count = 2
-            left_count = width - (t_width + 4)
+        match self.align:
+            case "left":
+                left_count = 2
+                right_count = width - (t_width + 4)
+            case "right":
+                right_count = 2
+                left_count = width - (t_width + 4)
+            case _:
+                pass
 
         if left_count < 1:
             left_count = 1

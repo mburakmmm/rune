@@ -9,9 +9,9 @@
   <p align="center">
     <a href="https://github.com/mburakmmm/rune/actions/workflows/ci.yml"><img src="https://github.com/mburakmmm/rune/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://github.com/mburakmmm/rune/releases"><img src="https://img.shields.io/github/v/release/mburakmmm/rune?color=6f42c1&logo=github" alt="GitHub Release"></a>
-    <a href="https://noxlang.com"><img src="https://img.shields.io/badge/noxc-%3E%3D%202.1.186-0366d6?logo=terminal" alt="Nox Version"></a>
+    <a href="https://noxlang.com"><img src="https://img.shields.io/badge/noxc-%3E%3D%202.2.38-0366d6?logo=terminal" alt="Nox Version"></a>
     <a href="https://github.com/mburakmmm/rune/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mburakmmm/rune?color=2ea44f" alt="License"></a>
-    <a href="https://github.com/mburakmmm/rune#testing--verification"><img src="https://img.shields.io/badge/tests-25%20passed-success" alt="Tests"></a>
+    <a href="https://github.com/mburakmmm/rune#testing--verification"><img src="https://img.shields.io/badge/tests-26%20passed-success" alt="Tests"></a>
     <a href="https://github.com/mburakmmm/rune#security-model"><img src="https://img.shields.io/badge/dependencies-0%20native-blue" alt="Zero Dependencies"></a>
   </p>
 </p>
@@ -73,7 +73,7 @@ Whether you are writing a simple CLI utility with nested subcommands, rendering 
 
 ## Minimum Compiler Requirement
 
-- **Nox Compiler**: `noxc >= 2.1.186`
+- **Nox Compiler**: `noxc >= 2.2.38`
 - **Supported Operating Systems**: Linux (`x86_64`, `arm64`), macOS (`Apple Silicon`, `Intel`), Windows 10/11 (`x64`)
 
 ---
@@ -295,20 +295,20 @@ rune
 Rune maintains a 100% green automated test suite across unit, integration, benchmark, and visual snapshot tests:
 
 ```bash
-# Run all 25 test suites
+# Run all 26 test suites
 noxc test
 
 # Run performance benchmarks
 noxc run benchmarks/run_benchmarks.nox
 ```
 
-### Performance SLA (v2.0.0 on `noxc 2.1.186`)
+### Performance SLA (v2.1.0 on `noxc 2.2.38`)
 
 | Benchmark Component | Workload | Measured Latency |
 | :--- | :--- | :--- |
-| **Table Layout & Render** | 1,000 rows × 3 columns | **22 ms** |
-| **CLI Argument Parsing** | 1,000 arguments | **1 ms** |
-| **Syntax Highlighting** | 800 lines with line numbers | **3 ms** |
+| **Table Layout & Render** | 1,000 rows × 3 columns | **2 ms** |
+| **CLI Argument Parsing** | 1,000 arguments | **3 ms** |
+| **Syntax Highlighting** | 800 lines with line numbers | **2 ms** |
 | **Markdown Parsing** | 700 lines with code blocks | **1 ms** |
 | **Tree Traversal** | 1,000 nodes | **< 1 ms** |
 

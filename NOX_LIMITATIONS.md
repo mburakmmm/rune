@@ -1,11 +1,12 @@
 # NOX Runtime & Compiler Requirements for Rune (NOX_LIMITATIONS.md)
 
-> **Durum Güncellemesi (`noxc 2.1.186` / Rune `v1.5.0`):**
-> Nox `v2.1.x` ile standart kütüphaneye **`nox.terminal`** ve **`nox.signal`** modülleri eklendi. Bu sayede aşağıda listelenen gereksinimlerin neredeyse tamamı (**raw mode, `poll_input`, `read_raw`, `get_size`, `is_tty`, `get_capabilities`, `write_raw`, `flush`, `set_echo`, `restore_state`, `SIGINT`/`SIGTERM`**) doğrudan karşılandı ve Rune `v1.5.0` ile entegre edildi.
+> **Durum Güncellemesi (`noxc 2.2.38` / Rune `v2.1.0`):**
+> - Nox `v2.1.x` ile `nox.terminal` ve `nox.signal` standart kütüphaneye eklendi ve Rune `v1.5.0`/`v2.0.0` ile entegre edildi.
+> - Nox `v2.2.0`–`v2.2.38` ile **`nox.terminal.write_raw()` / `flush()` artık Windows ve yönlendirilmiş stdout/pipe hedeflerinde de çalışıyor** (`Pulse NOX-IO-001`) ve **`nox.signal` Windows konsol olaylarını (`SIGINT` Ctrl+C, `SIGTERM` Ctrl+Break/oturum kapatma, `SIGHUP`) ile SCM durdurmayı destekliyor** (`v2.2.2`/`v2.2.5`).
 >
-> **Nox `v2.1.186`’da hâlâ devam eden platform sınırları:**
-> 1. **Windows Konsol Raw Mode & Echo:** `nox.terminal` Windows’ta `is_tty == False` döner; `enable_raw_mode()` ve `set_echo()` `TerminalError` fırlatır. Rune `is_tty(0)` ve `try/except TerminalError` ile güvenli sade moda düşer.
-> 2. **`SIGWINCH` Sinyali:** `nox.signal` içinde `sigwinch` bulunmaz. Rune `AppRunner.run_interactive()` döngüsünde `nox.terminal.get_size()` yoklaması (polling) ile boyut değişimini yakalar.
+> **Nox `v2.2.38`’de hâlâ devam eden platform sınırları:**
+> 1. **Windows / WASM Konsol Raw Mode, TTY & Echo:** `nox.terminal` Windows’ta `is_tty == False` döner; `enable_raw_mode()` ve `set_echo()` `TerminalError` fırlatır (`write_raw` ve `flush` çalışır). Rune `is_tty(0)` ve `try/except TerminalError` ile güvenli sade moda düşer.
+> 2. **`SIGWINCH` ve `SIGUSR1`/`SIGUSR2`:** `nox.signal` içinde `SIGWINCH` (ve Windows’ta `SIGUSR1/2`) bulunmaz. Rune `AppRunner.run_interactive()` döngüsünde `nox.terminal.get_size()` yoklaması (polling) ile boyut değişimini yakalar.
 
 ---
 
